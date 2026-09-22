@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    discovery:
+      enabled: false
+
+server:
+  port: 8080
+
+pulsefit:
+  jwt:
+    public-key-path: classpath:jwt-public.pem
+    issuer: pulsefit-auth-service
+    audience: pulsefit-api
+

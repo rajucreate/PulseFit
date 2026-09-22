@@ -1,0 +1,24 @@
+# Secrets and Keys
+**/jwt-private*.pem
+**/jwt-private.pem
+config/secrets/
+*.pem
+!**/jwt-public.pem
+
+# Maven target directories
+**/target/
+target/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+.metadata/
