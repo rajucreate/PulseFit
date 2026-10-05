@@ -1,9 +1,10 @@
 # Secrets and Keys
-**/jwt-private*.pem
+# Production signing key stays local. The test key is a fixture paired with jwt-public.pem.
 **/jwt-private.pem
 config/secrets/
 *.pem
 !**/jwt-public.pem
+!**/jwt-private-test.pem
 
 # Maven target directories
 **/target/
@@ -20,5 +21,9 @@ target/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 .metadata/
