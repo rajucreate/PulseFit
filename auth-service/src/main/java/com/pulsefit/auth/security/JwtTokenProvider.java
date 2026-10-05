@@ -95,7 +95,7 @@ public class JwtTokenProvider {
   }
 
   private PrivateKey loadPrivateKey(String location) throws Exception {
-    Resource resource = resourceLoader.getResource(location);
+    Resource resource = resolvePrivateKey(location);
     try (InputStream is = resource.getInputStream()) {
       String keyStr = new String(is.readAllBytes(), StandardCharsets.UTF_8);
       keyStr = keyStr.replace("-----BEGIN PRIVATE KEY-----", "")
@@ -105,6 +105,30 @@ public class JwtTokenProvider {
       PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
       return KeyFactory.getInstance("RSA").generatePrivate(keySpec);
     }
+  }
+
+  /**
+   * STS 4 runs a Spring Boot app with the service project as the working directory
+   * ({@code auth-service}). A workspace-root launch looks one folder deeper.
+   */
+  private Resource resolvePrivateKey(String configuredLocation) {
+    String[] candidates = {
+      configuredLocation,
+      "file:./config/secrets/jwt-private.pem",
+      "file:./auth-service/config/secrets/jwt-private.pem"
+    };
+    Resource fallback = null;
+    for (String candidate : candidates) {
+      if (candidate == null || candidate.isBlank()) {
+        continue;
+      }
+      Resource resource = resourceLoader.getResource(candidate);
+      if (resource.exists()) {
+        return resource;
+      }
+      fallback = resource;
+    }
+    return fallback;
   }
 
   private PublicKey loadPublicKey(String location) throws Exception {

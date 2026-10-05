@@ -24,6 +24,23 @@ spring:
           uri: lb://ATTENDANCE-SERVICE
           predicates:
             - Path=/api/attendance/**
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
 server:
   port: ${PORT:8080}
 eureka:

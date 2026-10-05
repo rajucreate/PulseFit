@@ -54,6 +54,11 @@ public class SecurityContextFilter implements WebFilter, Ordered {
                   httpHeaders.remove("X-Caller-Service");
                 });
 
+    // Browser preflight has no bearer token. Let the gateway CORS config answer it.
+    if (HttpMethod.OPTIONS.equals(method)) {
+      return chain.filter(exchange.mutate().request(requestBuilder.build()).build());
+    }
+
     // 2. Check if route is explicitly public
     if (isPublicRoute(path, method)) {
       return chain.filter(exchange.mutate().request(requestBuilder.build()).build());

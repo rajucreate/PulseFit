@@ -11,6 +11,7 @@ import com.pulsefit.auth.repository.UserRepository;
 import com.pulsefit.auth.security.JwtTokenProvider;
 import feign.FeignException;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,7 +74,9 @@ public class AuthService {
     if (request.dateOfBirth() != null && !request.dateOfBirth().isBlank()) {
       try {
         dob = LocalDate.parse(request.dateOfBirth());
-      } catch (Exception ignored) {}
+      } catch (DateTimeParseException ex) {
+        throw new BadRequestException("dateOfBirth must be a valid date in yyyy-MM-dd format");
+      }
     }
 
     String fullName = (request.firstName() + " " + request.lastName()).trim();
