@@ -46,7 +46,10 @@ export default function Login() {
         </Button>
       </form>
       <p className="auth-switch">
-        New member? <Link to="/register">Create an account</Link>
+        <Link to="/forgot">Forgot password?</Link>
+      </p>
+      <p className="auth-switch">
+        New members join by invitation from a club administrator.
       </p>
       <p className="auth-switch">
         Already on the member list? <Link to="/claim">Claim your profile</Link>

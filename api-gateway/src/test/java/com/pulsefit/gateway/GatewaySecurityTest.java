@@ -39,6 +39,7 @@ class GatewaySecurityTest {
     jwtTokenValidator.init();
 
     filter = new SecurityContextFilter(jwtTokenValidator, revocationService);
+    clearInvocations(filterChain);
   }
 
   @Test
@@ -57,6 +58,29 @@ class GatewaySecurityTest {
       HttpHeaders headers = ex.getRequest().getHeaders();
       return !headers.containsKey("X-User-Role"); // Verify spoofed header stripped
     }));
+  }
+
+  @Test
+  void invitationAcceptAndPasswordReset_ArePublic() {
+    when(filterChain.filter(any())).thenReturn(Mono.empty());
+    for (MockServerHttpRequest request : new MockServerHttpRequest[] {
+      MockServerHttpRequest.post("/api/auth/invitations/accept").build(),
+      MockServerHttpRequest.get("/api/auth/invitations/preview").queryParam("token", "abc").build(),
+      MockServerHttpRequest.post("/api/auth/password/forgot").build(),
+      MockServerHttpRequest.post("/api/auth/password/reset").build()
+    }) {
+      filter.filter(MockServerWebExchange.from(request), filterChain).block();
+    }
+    verify(filterChain, times(4)).filter(any());
+  }
+
+  @Test
+  void invitationCreate_MissingToken_Returns401() {
+    MockServerWebExchange exchange =
+        MockServerWebExchange.from(MockServerHttpRequest.post("/api/auth/invitations").build());
+    filter.filter(exchange, filterChain).block();
+    assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+    verify(filterChain, never()).filter(any());
   }
 
   @Test

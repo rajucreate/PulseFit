@@ -9,7 +9,6 @@ import com.pulsefit.payment.client.Clients.SubscriptionClient;
 import com.pulsefit.payment.client.Clients.CheckoutCommand;
 import com.pulsefit.payment.client.Clients.SubscriptionView;
 import com.pulsefit.payment.razorpay.RazorpayGateway;
-import com.pulsefit.payment.razorpay.RazorpayHttpGateway;
 import com.pulsefit.payment.dto.CheckoutDtos.CancelRequest;
 import com.pulsefit.payment.dto.CheckoutDtos.CheckoutResponse;
 import com.pulsefit.payment.dto.CheckoutDtos.VerifyRequest;
@@ -39,8 +38,8 @@ public class PaymentService {
   private static final Set<String> METHODS = Set.of("SIMULATED_CARD", "SIMULATED_UPI", "SIMULATED_FAIL");
   private static final String SIMULATED_NOTE =
       "Simulated provider only. No card was charged and no real money moved.";
-  private static final String TEST_NOTE =
-      "Razorpay test mode. This is not a live UPI transfer and no real money has moved.";
+  private static final String DEMO_NOTE =
+      "Simulated demo payment. No card was charged and no money was transferred.";
 
   private final PaymentRepository repository;
   private final SubscriptionClient subscriptions;
@@ -67,34 +66,50 @@ public class PaymentService {
   @Transactional
   public CheckoutResponse checkout(Long memberId, Long planId) {
     SubscriptionView subscription = prepare(memberId, planId);
-    if (!razorpay.configured()) {
-      throw new ServiceUnavailableException(RazorpayHttpGateway.missingKeys());
-    }
     PlanView plan = loadPlan(subscription.planId());
-    int paise = paise(plan.price());
     var open =
         repository.findFirstBySubscriptionIdAndPaymentStatus(subscription.id(), PaymentStatus.PENDING);
-    if (open.isPresent() && open.get().getProviderOrderId() != null) {
+    if (open.isPresent() && "DEMO_CARD".equals(open.get().getPaymentMethod())) {
       return checkoutResponse(open.get(), plan, subscription);
     }
-    var order = razorpay.createOrder(paise, "sub_" + subscription.id());
-    if (order.amountPaise() != paise || order.id() == null || order.id().isBlank()) {
-      throw new IllegalArgumentException("Razorpay order amount did not match the plan price");
-    }
+    String reference = "demo-" + UUID.randomUUID();
     Payment payment =
         new Payment(
             memberId,
             subscription.id(),
             plan.price(),
-            "RAZORPAY_UPI",
-            order.id(),
+            "DEMO_CARD",
+            reference,
             PaymentStatus.PENDING,
             OffsetDateTime.now(),
-            "rzp-" + order.id(),
-            false,
-            TEST_NOTE);
-    payment.attachOrder(order.id());
+            reference,
+            true,
+            DEMO_NOTE);
+    payment.attachOrder(reference);
     return checkoutResponse(repository.save(payment), plan, subscription);
+  }
+
+  @Transactional
+  public PaymentResponse completeDemo(Long memberId, Long paymentId) {
+    Payment payment = require(paymentId);
+    if (!payment.getMemberId().equals(memberId)) {
+      throw new IllegalArgumentException("This payment does not belong to the signed-in member");
+    }
+    if (!"DEMO_CARD".equals(payment.getPaymentMethod())) {
+      throw new IllegalArgumentException("Only the demo card checkout can be completed here");
+    }
+    if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
+      activateRequired(payment.getSubscriptionId());
+      return toResponse(payment);
+    }
+    if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+      throw new IllegalArgumentException("This demo checkout is no longer payable");
+    }
+    payment.applyResult(PaymentStatus.SUCCESS, payment.getTransactionId(), DEMO_NOTE);
+    Payment saved = repository.save(payment);
+    activateRequired(saved.getSubscriptionId());
+    notifyQuietly(saved, "membership");
+    return toResponse(saved);
   }
 
   @Transactional
@@ -118,13 +133,13 @@ public class PaymentService {
       throw new IllegalArgumentException("Payment does not match this order");
     }
     if (!"captured".equalsIgnoreCase(fetched.status())) {
-      payment.applyResult(PaymentStatus.FAILED, payment.getTransactionId(), TEST_NOTE + " Payment was not captured.");
+      payment.applyResult(PaymentStatus.FAILED, payment.getTransactionId(), DEMO_NOTE + " Payment was not captured.");
       Payment saved = repository.save(payment);
       cancelQuietly(saved.getSubscriptionId());
       notifyQuietly(saved, "membership");
       return toResponse(saved);
     }
-    payment.applyResult(PaymentStatus.SUCCESS, fetched.id(), TEST_NOTE + " Signature and amount were verified.");
+    payment.applyResult(PaymentStatus.SUCCESS, fetched.id(), DEMO_NOTE);
     Payment saved = repository.save(payment);
     activateRequired(saved.getSubscriptionId());
     notifyQuietly(saved, "membership");
@@ -146,7 +161,7 @@ public class PaymentService {
     if (payment.getPaymentStatus() == PaymentStatus.FAILED || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
       return toResponse(payment);
     }
-    payment.applyResult(PaymentStatus.FAILED, payment.getTransactionId(), TEST_NOTE + " Checkout was cancelled.");
+    payment.applyResult(PaymentStatus.FAILED, payment.getTransactionId(), DEMO_NOTE + " Checkout was cancelled.");
     Payment saved = repository.save(payment);
     cancelQuietly(saved.getSubscriptionId());
     return toResponse(saved);
@@ -301,11 +316,11 @@ public class PaymentService {
         plan.price(),
         "INR",
         paise(plan.price()),
-        razorpay.keyId(),
+        null,
         payment.getProviderOrderId(),
         payment.getPaymentStatus().name(),
         true,
-        TEST_NOTE + " UPI is offered in Razorpay test checkout. Use success@razorpay or failure@razorpay.");
+        DEMO_NOTE);
   }
 
   private int paise(BigDecimal amount) {

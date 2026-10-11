@@ -12,7 +12,7 @@ export default function AuthFrame({ title, text, children }) {
           <p className="eyebrow light">Multi-facility membership</p>
           <h1>The floor, the plan, and the front desk in one place.</h1>
           <ul>
-            <li>Members register once and carry a profile across facilities.</li>
+            <li>Administrators invite members, who then choose their own password.</li>
             <li>Staff open plans, subscriptions, and check-in from the gateway.</li>
             <li>Every visit is recorded, granted or denied.</li>
           </ul>

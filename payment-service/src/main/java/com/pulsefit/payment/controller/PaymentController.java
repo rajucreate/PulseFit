@@ -2,6 +2,7 @@ package com.pulsefit.payment.controller;
 
 import com.pulsefit.payment.dto.CheckoutDtos.CancelRequest;
 import com.pulsefit.payment.dto.CheckoutDtos.CheckoutRequest;
+import com.pulsefit.payment.dto.CheckoutDtos.DemoPayRequest;
 import com.pulsefit.payment.dto.CheckoutDtos.CheckoutResponse;
 import com.pulsefit.payment.dto.CheckoutDtos.VerifyRequest;
 import com.pulsefit.payment.dto.PaymentRequest;
@@ -33,6 +34,11 @@ public class PaymentController {
   @PostMapping("/verify")
   public PaymentResponse verify(@Valid @RequestBody VerifyRequest request, Authentication authentication) {
     return service.verify(requireSelf(authentication), request);
+  }
+
+  @PostMapping("/checkout/demo")
+  public PaymentResponse demo(@Valid @RequestBody DemoPayRequest request, Authentication authentication) {
+    return service.completeDemo(requireSelf(authentication), request.paymentId());
   }
 
   @PostMapping("/checkout/cancel")

@@ -18,8 +18,8 @@ export default function CheckoutResult() {
     <div>
       <PageHeader
         eyebrow="Payment"
-        title={failed ? 'Payment not completed' : 'Payment verified'}
-        text="This page only reflects a result the payment service verified. Closing Razorpay does not activate a membership."
+        title={failed ? 'Payment not completed' : 'Demo payment recorded'}
+        text="This is a simulated card payment. No money was transferred, and the membership starts only after the server records the demo payment."
       />
       {!payment && !failed ? (
         <section className="panel">
@@ -31,7 +31,7 @@ export default function CheckoutResult() {
         <section className="panel">
           <Badge tone="bad">Inactive</Badge>
           <h2>The membership was not activated</h2>
-          <p>The test payment failed or the checkout was closed. You can try again. A failed attempt does not block a later purchase.</p>
+          <p>The demo checkout was cancelled or did not finish. The membership stays inactive, and you can try again.</p>
           <p className="muted">Order {state?.orderId || payment?.transactionId || '—'}</p>
           <Link className="btn btn-primary" to="/plans">Try another checkout</Link>
         </section>

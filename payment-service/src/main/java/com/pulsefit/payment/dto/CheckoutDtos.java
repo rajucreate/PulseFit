@@ -14,6 +14,8 @@ public class CheckoutDtos {
 
   public record CancelRequest(@NotBlank String orderId) {}
 
+  public record DemoPayRequest(@NotNull Long paymentId) {}
+
   public record CheckoutResponse(
       Long paymentId,
       Long subscriptionId,

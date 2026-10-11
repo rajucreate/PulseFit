@@ -55,36 +55,12 @@ class AuthServiceTest {
   }
 
   @Test
-  void register_NewMember_Success() {
+  void register_PublicSignupIsClosed() {
     RegisterRequest req =
         new RegisterRequest("new.user@pulsefit.com", "Password123!", "John", "Doe", "555-1234", "1990-01-01");
 
-    when(userRepository.existsByEmail("new.user@pulsefit.com")).thenReturn(false);
-    when(memberServiceClient.findByEmail("new.user@pulsefit.com")).thenThrow(FeignException.NotFound.class);
-    when(memberServiceClient.createMember(any(CreateMemberRequest.class)))
-        .thenReturn(new MemberDto(50L, "John Doe", "new.user@pulsefit.com", "555-1234", LocalDate.of(1990, 1, 1), "ACTIVE", OffsetDateTime.now()));
-    when(passwordEncoder.encode("Password123!")).thenReturn("hashed_pw");
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> {
-      User u = inv.getArgument(0);
-      u.setId(10L);
-      return u;
-    });
-
-    AuthResponse resp = authService.register(req, "127.0.0.1");
-    assertNotNull(resp);
-    assertNotNull(resp.accessToken());
-    assertEquals(Role.MEMBER, resp.user().role());
-    assertEquals(50L, resp.user().memberId());
-  }
-
-  @Test
-  void register_DuplicateEmail_ThrowsConflict() {
-    RegisterRequest req =
-        new RegisterRequest("existing@pulsefit.com", "Password123!", "Jane", "Doe", null, null);
-
-    when(userRepository.existsByEmail("existing@pulsefit.com")).thenReturn(true);
-
-    assertThrows(ConflictException.class, () -> authService.register(req, "127.0.0.1"));
+    assertThrows(ForbiddenException.class, () -> authService.register(req, "127.0.0.1"));
+    verify(userRepository, never()).save(any());
   }
 
   @Test
