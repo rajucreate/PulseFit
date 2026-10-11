@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
@@ -92,5 +93,32 @@ class GatewaySecurityTest {
 
     assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
     verify(filterChain, never()).filter(any());
+  }
+
+  @Test
+  void traineeCannotOpenPaymentsOrChangeSubscriptions() {
+    assertEquals(false, authorized("/api/payments", HttpMethod.GET));
+    assertEquals(false, authorized("/api/payments/member/4", HttpMethod.GET));
+    assertEquals(false, authorized("/api/payments/checkout", HttpMethod.POST));
+    assertEquals(false, authorized("/api/subscriptions", HttpMethod.POST));
+    assertEquals(false, authorized("/api/subscriptions/9", HttpMethod.PUT));
+    assertEquals(false, authorized("/api/attendance/check-in", HttpMethod.POST));
+    assertEquals(false, authorized("/api/members", HttpMethod.GET));
+    assertEquals(true, authorized("/api/subscriptions/member/4", HttpMethod.GET));
+    assertEquals(true, authorized("/api/attendance/member/4", HttpMethod.GET));
+    assertEquals(true, authorized("/api/trainers/me/roster", HttpMethod.GET));
+    assertEquals(true, authorized("/api/plans", HttpMethod.GET));
+  }
+
+  @Test
+  void adminStillReachesPayments() {
+    assertEquals(
+        true,
+        ReflectionTestUtils.invokeMethod(filter, "isAuthorized", "/api/payments", HttpMethod.GET, "ADMIN"));
+  }
+
+  private boolean authorized(String path, HttpMethod method) {
+    return Boolean.TRUE.equals(
+        ReflectionTestUtils.invokeMethod(filter, "isAuthorized", path, method, "TRAINEE"));
   }
 }

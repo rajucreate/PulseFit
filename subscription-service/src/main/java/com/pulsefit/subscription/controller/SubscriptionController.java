@@ -1,8 +1,11 @@
 package com.pulsefit.subscription.controller;
 
+import com.pulsefit.subscription.client.TraineeAssignmentClient;
+import com.pulsefit.subscription.client.TraineeAssignmentClient.AssignmentCheck;
 import com.pulsefit.subscription.dto.*;
 import com.pulsefit.subscription.security.AuthenticatedUser;
 import com.pulsefit.subscription.service.SubscriptionService;
+import feign.FeignException;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -15,19 +18,25 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {
   private final SubscriptionService service;
+  private final TraineeAssignmentClient assignments;
 
-  public SubscriptionController(SubscriptionService service) {
+  public SubscriptionController(SubscriptionService service, TraineeAssignmentClient assignments) {
     this.service = service;
+    this.assignments = assignments;
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public SubscriptionResponse create(
       @Valid @RequestBody SubscriptionRequest r, Authentication authentication) {
-    if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user
-        && "MEMBER".equalsIgnoreCase(user.role())) {
-      throw new AccessDeniedException(
-          "Choose a plan and complete checkout. A membership is activated only after payment is verified.");
+    if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      if ("TRAINEE".equalsIgnoreCase(user.role())) {
+        throw new AccessDeniedException("Trainees cannot create or change subscriptions.");
+      }
+      if ("MEMBER".equalsIgnoreCase(user.role())) {
+        throw new AccessDeniedException(
+            "Choose a plan and complete checkout. A membership is activated only after payment is verified.");
+      }
     }
     enforceMemberIdOwnership(r.memberId(), authentication, "create subscription for");
     return service.create(r);
@@ -54,7 +63,8 @@ public class SubscriptionController {
   }
 
   @GetMapping("/member/{memberId}/valid")
-  public ValidityResponse valid(@PathVariable Long memberId) {
+  public ValidityResponse valid(@PathVariable Long memberId, Authentication authentication) {
+    enforceMemberIdOwnership(memberId, authentication, "view subscription status for");
     return service.validity(memberId);
   }
 
@@ -63,6 +73,11 @@ public class SubscriptionController {
       @PathVariable Long id,
       @Valid @RequestBody SubscriptionRequest r,
       Authentication authentication) {
+    if (authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUser user
+        && "TRAINEE".equalsIgnoreCase(user.role())) {
+      throw new AccessDeniedException("Trainees cannot create or change subscriptions.");
+    }
     SubscriptionResponse existing = service.get(id);
     enforceMemberIdOwnership(existing.memberId(), authentication, "update subscription of");
     enforceMemberIdOwnership(r.memberId(), authentication, "change subscription member to");
@@ -79,12 +94,30 @@ public class SubscriptionController {
   private void enforceMemberIdOwnership(
       Long targetMemberId, Authentication authentication, String action) {
     if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      if ("TRAINEE".equalsIgnoreCase(user.role())) {
+        assertAssigned(user, targetMemberId);
+        return;
+      }
       if ("MEMBER".equalsIgnoreCase(user.role())) {
         if (user.memberId() == null || !user.memberId().equals(targetMemberId)) {
           throw new AccessDeniedException(
               "Access denied: You can only " + action + " your own member ID (" + user.memberId() + ").");
         }
       }
+    }
+  }
+
+  private void assertAssigned(AuthenticatedUser user, Long memberId) {
+    if (user.email() == null || user.email().isBlank() || assignments == null) {
+      throw new AccessDeniedException("This member is not assigned to you.");
+    }
+    try {
+      AssignmentCheck check = assignments.assigned(user.email(), memberId);
+      if (check == null || !check.assigned()) {
+        throw new AccessDeniedException("This member is not assigned to you.");
+      }
+    } catch (FeignException ex) {
+      throw new AccessDeniedException("This member is not assigned to you.");
     }
   }
 }

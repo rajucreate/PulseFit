@@ -49,6 +49,8 @@ function monthCells(month, marked) {
 export default function Attendance() {
   const { user } = useAuth();
   const desk = user?.role === 'STAFF' || user?.role === 'ADMIN';
+  const trainee = user?.role === 'TRAINEE';
+  const showMember = desk || trainee;
   const [rows, setRows] = useState([]);
   const [members, setMembers] = useState([]);
   const [facilities, setFacilities] = useState([]);
@@ -60,6 +62,7 @@ export default function Attendance() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [filterFacility, setFilterFacility] = useState('');
+  const [memberFilter, setMemberFilter] = useState('');
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -90,6 +93,14 @@ export default function Attendance() {
         setPlans(planList);
         const today = todayISO();
         setSubscription(subs.find((row) => row.status === 'ACTIVE' && String(row.expiryDate) >= today) || null);
+        return;
+      }
+      if (user.role === 'TRAINEE') {
+        const roster = await api('/api/trainers/me/roster');
+        const assigned = (roster.members || []).map((member) => ({ id: member.memberId, name: member.name }));
+        setMembers(assigned);
+        const lists = await Promise.all(assigned.map((member) => api(`/api/attendance/member/${member.id}`)));
+        setRows(lists.flat());
         return;
       }
       const [visits, memberList] = await Promise.all([api('/api/attendance'), api('/api/members')]);
@@ -138,9 +149,10 @@ export default function Attendance() {
       if (from && key < from) return false;
       if (to && key > to) return false;
       if (filterFacility && String(row.facilityId) !== String(filterFacility)) return false;
+      if (memberFilter && String(row.memberId) !== String(memberFilter)) return false;
       return true;
     });
-  }, [rows, from, to, filterFacility]);
+  }, [rows, from, to, filterFacility, memberFilter]);
 
   const granted = rows.filter((row) => row.accessStatus === 'GRANTED');
   const grantedDays = [...new Set(granted.map((row) => dayKey(row.checkInTime)))];
@@ -163,10 +175,10 @@ export default function Attendance() {
       <PageHeader
         eyebrow="Floor"
         title="Attendance"
-        text="Check-in records every attempt. Access is granted only when the attendance service finds a valid membership."
+        text={trainee ? 'Read-only check-in history for members assigned to you.' : 'Check-in records every attempt. Access is granted only when the attendance service finds a valid membership.'}
       />
       <Alert>{error}</Alert>
-      {!desk ? (
+      {!showMember ? (
         <section className="stat-grid four">
           <article className="stat"><p>Today</p><strong>{todayVisit ? todayVisit.accessStatus : 'Not yet'}</strong></article>
           <article className="stat"><p>This month</p><strong>{monthVisits.length}</strong><span>granted visits</span></article>
@@ -181,7 +193,7 @@ export default function Attendance() {
           <article className="stat"><p>This month</p><strong>{monthVisits.length}</strong><span>granted</span></article>
         </section>
       )}
-      {!desk && subscription ? (
+      {!showMember && subscription ? (
         <section className="panel">
           <h2>Membership</h2>
           <p>
@@ -189,12 +201,13 @@ export default function Attendance() {
           </p>
         </section>
       ) : null}
-      {!desk && !loading && user.memberId && !subscription ? (
+      {!showMember && !loading && user.memberId && !subscription ? (
         <section className="panel">
           <h2>No current membership</h2>
           <p>An expired or missing membership is rejected at check-in. Buy a plan after the previous one expires.</p>
         </section>
       ) : null}
+      {trainee ? null : (
       <section className="panel checkin">
         <h2>Check in</h2>
         <form onSubmit={checkIn} className="checkin-form">
@@ -229,7 +242,8 @@ export default function Attendance() {
           </div>
         ) : null}
       </section>
-      {!desk ? (
+      )}
+      {!showMember ? (
         <section className="panel">
           <h2>This month</h2>
           <div className="calendar">
@@ -270,6 +284,12 @@ export default function Attendance() {
       <form className="toolbar split" onSubmit={(event) => { event.preventDefault(); setPage(0); }}>
         <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(0); }} />
         <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(0); }} />
+        {showMember ? (
+          <select value={memberFilter} onChange={(e) => { setMemberFilter(e.target.value); setPage(0); }}>
+            <option value="">{trainee ? 'All assigned members' : 'All members'}</option>
+            {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+          </select>
+        ) : null}
         <select value={filterFacility} onChange={(e) => { setFilterFacility(e.target.value); setPage(0); }}>
           <option value="">All facilities</option>
           {facilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
@@ -283,7 +303,7 @@ export default function Attendance() {
             <thead>
               <tr>
                 <th>When</th>
-                {desk ? <th>Member</th> : null}
+                {showMember ? <th>Member</th> : null}
                 <th>Facility</th>
                 <th>Result</th>
                 <th>Note</th>
@@ -293,7 +313,7 @@ export default function Attendance() {
               {visible.map((row) => (
                 <tr key={row.id}>
                   <td>{formatDateTime(row.checkInTime)}</td>
-                  {desk ? <td>{memberName(row.memberId)}</td> : null}
+                  {showMember ? <td>{memberName(row.memberId)}</td> : null}
                   <td>{facilityName(row.facilityId)}</td>
                   <td><Badge tone={statusTone(row.accessStatus)}>{row.accessStatus}</Badge></td>
                   <td>{row.denialReason || (row.subscriptionId ? `Subscription ${row.subscriptionId}` : '—')}</td>

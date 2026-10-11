@@ -129,7 +129,7 @@ Public registration is closed. An administrator opens **Invitations**, enters a 
 
 Invitation and password-reset mail is sent by the Node mailer on port 8090 (`mailer-service`, Nodemailer). Put the SMTP values in `mailer-service/.env` (copy `.env.example`). That file is not committed. Start the mailer with `npm start` in `mailer-service`, then restart it after changing `.env`. Auth Service calls `http://127.0.0.1:8090` and does not send mail itself. When an administrator uses **Add member**, the profile is saved and the same invitation email goes to that address. If `SMTP_HOST` is empty, the invitation is saved and the screen says the email was not sent. In that development case the response also includes the invite link. Do not treat that link as a sent email.
 
-The login page shows two local accounts: admin `admin@pulsefit.com` / `Admin@PulseFit2026`, and trainee `trainee@pulsefit.com` / `Trainee@PulseFit2026`. The catalog seeds Weekly, Quarterly, Half Year, and Annual plans alongside any plan already stored, including Monthly.
+The login page shows two local accounts: admin `admin@pulsefit.com` / `Admin@PulseFit2026`, and trainee `trainee@pulsefit.com` / `Trainee@PulseFit2026`. The trainee role is read-only and sees only members assigned in the trainer service. Payments, checkout, and subscription changes stay with members, staff, and administrators. The catalog seeds Weekly, Quarterly, Half Year, and Annual plans alongside any plan already stored, including Monthly.
 
 ```text
 SMTP_HOST=

@@ -1,8 +1,7 @@
 package com.pulsefit.auth.bootstrap;
 
-import com.pulsefit.auth.client.CreateMemberRequest;
-import com.pulsefit.auth.client.MemberDto;
-import com.pulsefit.auth.client.MemberServiceClient;
+import com.pulsefit.auth.client.TrainerBootstrapClient;
+import com.pulsefit.auth.client.TrainerBootstrapClient.BootstrapRequest;
 import com.pulsefit.auth.model.Role;
 import com.pulsefit.auth.model.User;
 import com.pulsefit.auth.repository.UserRepository;
@@ -16,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class TraineeBootstrapRunner implements CommandLineRunner {
   private final UserRepository users;
   private final PasswordEncoder passwordEncoder;
-  private final MemberServiceClient members;
+  private final TrainerBootstrapClient trainers;
 
   @Value("${pulsefit.trainee.bootstrap.email:trainee@pulsefit.com}")
   private String email;
@@ -25,53 +24,47 @@ public class TraineeBootstrapRunner implements CommandLineRunner {
   private String password;
 
   public TraineeBootstrapRunner(
-      UserRepository users, PasswordEncoder passwordEncoder, MemberServiceClient members) {
+      UserRepository users, PasswordEncoder passwordEncoder, TrainerBootstrapClient trainers) {
     this.users = users;
     this.passwordEncoder = passwordEncoder;
-    this.members = members;
+    this.trainers = trainers;
   }
 
   @Override
   public void run(String... args) {
-    if (users.findByEmailIgnoreCase(email).isPresent()) {
-      System.out.println(">>> [Auth Service] Trainee account already exists: " + email);
-      return;
+    User user = users.findByEmailIgnoreCase(email).orElse(null);
+    if (user == null) {
+      user =
+          users.save(
+              new User(
+                  email,
+                  passwordEncoder.encode(password),
+                  "Trainee",
+                  "Coach",
+                  Role.TRAINEE,
+                  null));
+      System.out.println(">>> [Auth Service] Trainee account bootstrapped: " + email);
+    } else if (user.getRole() != Role.TRAINEE || user.getMemberId() != null) {
+      user.setRole(Role.TRAINEE);
+      user.setMemberId(null);
+      user.incrementTokenVersion();
+      users.save(user);
+      System.out.println(">>> [Auth Service] Trainee account updated to the trainee role: " + email);
     }
-    MemberDto member = findOrCreateMember();
-    if (member == null || member.id() == null) {
-      System.out.println(">>> [Auth Service] Trainee bootstrap skipped because the member profile was not created.");
-      return;
-    }
-    users.save(
-        new User(
-            email,
-            passwordEncoder.encode(password),
-            "Trainee",
-            "Member",
-            Role.MEMBER,
-            member.id()));
-    System.out.println(">>> [Auth Service] Trainee account bootstrapped: " + email);
+    linkTrainer(user.getEmail());
   }
 
-  private MemberDto findOrCreateMember() {
-    for (int attempt = 0; attempt < 5; attempt++) {
+  private void linkTrainer(String traineeEmail) {
+    for (int attempt = 0; attempt < 8; attempt++) {
       try {
-        MemberDto existing = members.findByEmail(email);
-        if (existing != null && existing.id() != null) return existing;
-      } catch (FeignException.NotFound ignored) {
-        // Create the profile below.
-      } catch (FeignException ex) {
-        pause();
-        continue;
-      }
-      try {
-        return members.createMember(
-            new CreateMemberRequest("Trainee Member", email, "555-0140", null, "ACTIVE"));
+        trainers.bootstrap(new BootstrapRequest(traineeEmail, "Trainee Coach", 1L));
+        System.out.println(">>> [Auth Service] Trainee trainer profile linked: " + traineeEmail);
+        return;
       } catch (FeignException ex) {
         pause();
       }
     }
-    return null;
+    System.out.println(">>> [Auth Service] Trainee trainer link skipped because the trainer service was unavailable.");
   }
 
   private static void pause() {

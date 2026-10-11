@@ -144,6 +144,10 @@ public class SecurityContextFilter implements WebFilter, Ordered {
       return false;
     }
 
+    if ("TRAINEE".equalsIgnoreCase(role)) {
+      return traineeAllowed(path, method);
+    }
+
     // Admin only routes
     if (path.startsWith("/api/auth/users")
         || path.startsWith("/api/auth/invitations")
@@ -208,6 +212,26 @@ public class SecurityContextFilter implements WebFilter, Ordered {
 
     // Member self-service and operations
     return true;
+  }
+
+  private boolean traineeAllowed(String path, HttpMethod method) {
+    if (!HttpMethod.GET.equals(method)) {
+      return false;
+    }
+    if (path.equals("/api/plans") || path.matches("/api/plans/\\d+")) {
+      return true;
+    }
+    if (path.equals("/api/facilities") || path.matches("/api/facilities/\\d+")) {
+      return true;
+    }
+    if (path.equals("/api/trainers/me/roster")) {
+      return true;
+    }
+    if (path.matches("/api/subscriptions/member/\\d+")
+        || path.matches("/api/subscriptions/member/\\d+/valid")) {
+      return true;
+    }
+    return path.matches("/api/attendance/member/\\d+");
   }
 
   private Mono<Void> onError(

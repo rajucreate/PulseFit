@@ -28,21 +28,25 @@ public class PaymentController {
 
   @PostMapping("/checkout")
   public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest request, Authentication authentication) {
+    rejectTrainee(authentication);
     return service.checkout(requireSelf(authentication), request.planId());
   }
 
   @PostMapping("/verify")
   public PaymentResponse verify(@Valid @RequestBody VerifyRequest request, Authentication authentication) {
+    rejectTrainee(authentication);
     return service.verify(requireSelf(authentication), request);
   }
 
   @PostMapping("/checkout/demo")
   public PaymentResponse demo(@Valid @RequestBody DemoPayRequest request, Authentication authentication) {
+    rejectTrainee(authentication);
     return service.completeDemo(requireSelf(authentication), request.paymentId());
   }
 
   @PostMapping("/checkout/cancel")
   public PaymentResponse cancel(@Valid @RequestBody CancelRequest request, Authentication authentication) {
+    rejectTrainee(authentication);
     return service.cancelCheckout(requireSelf(authentication), request);
   }
 
@@ -50,18 +54,21 @@ public class PaymentController {
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
   public PaymentResponse create(@Valid @RequestBody PaymentRequest request, Authentication authentication) {
+    rejectTrainee(authentication);
     enforce(request.memberId(), authentication, "pay for");
     return service.initiate(request);
   }
 
   @GetMapping
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-  public List<PaymentResponse> all() {
+  public List<PaymentResponse> all(Authentication authentication) {
+    rejectTrainee(authentication);
     return service.all();
   }
 
   @GetMapping("/{id}")
   public PaymentResponse get(@PathVariable Long id, Authentication authentication) {
+    rejectTrainee(authentication);
     PaymentResponse response = service.get(id);
     enforce(response.memberId(), authentication, "view payment of");
     return response;
@@ -69,6 +76,7 @@ public class PaymentController {
 
   @GetMapping("/member/{memberId}")
   public List<PaymentResponse> byMember(@PathVariable Long memberId, Authentication authentication) {
+    rejectTrainee(authentication);
     enforce(memberId, authentication, "view payments for");
     return service.byMember(memberId);
   }
@@ -76,6 +84,7 @@ public class PaymentController {
   @GetMapping("/subscription/{subscriptionId}")
   public List<PaymentResponse> bySubscription(
       @PathVariable Long subscriptionId, Authentication authentication) {
+    rejectTrainee(authentication);
     List<PaymentResponse> rows = service.bySubscription(subscriptionId);
     if (authentication != null
         && authentication.getPrincipal() instanceof AuthenticatedUser user
@@ -88,14 +97,24 @@ public class PaymentController {
   @PostMapping("/{id}/retry")
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
   public PaymentResponse retry(@PathVariable Long id, Authentication authentication) {
+    rejectTrainee(authentication);
     enforce(service.get(id).memberId(), authentication, "retry payment of");
     return service.retry(id);
   }
 
   @PostMapping("/{id}/refund")
   @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-  public PaymentResponse refund(@PathVariable Long id) {
+  public PaymentResponse refund(@PathVariable Long id, Authentication authentication) {
+    rejectTrainee(authentication);
     return service.refund(id);
+  }
+
+  private void rejectTrainee(Authentication authentication) {
+    if (authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUser user
+        && "TRAINEE".equalsIgnoreCase(user.role())) {
+      throw new AccessDeniedException("Trainees cannot view or manage payments.");
+    }
   }
 
   private Long requireSelf(Authentication authentication) {

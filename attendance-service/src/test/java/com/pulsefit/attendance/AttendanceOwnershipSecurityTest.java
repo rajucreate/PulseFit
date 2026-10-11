@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.pulsefit.attendance.client.SubscriptionClient;
+import com.pulsefit.attendance.client.TraineeAssignmentClient;
 import com.pulsefit.attendance.client.SubscriptionValidity;
 import com.pulsefit.attendance.controller.AttendanceController;
 import com.pulsefit.attendance.dto.AttendanceResponse;
@@ -30,6 +31,7 @@ class AttendanceOwnershipSecurityTest {
 
   @Mock private AttendanceRepository repository;
   @Mock private SubscriptionClient subscriptions;
+  @Mock private TraineeAssignmentClient assignments;
 
   private AttendanceService attendanceService;
   private AttendanceController controller;
@@ -37,7 +39,7 @@ class AttendanceOwnershipSecurityTest {
   @BeforeEach
   void setUp() {
     attendanceService = new AttendanceService(repository, subscriptions, null, null, null);
-    controller = new AttendanceController(attendanceService);
+    controller = new AttendanceController(attendanceService, assignments);
   }
 
   @Test
@@ -86,6 +88,19 @@ class AttendanceOwnershipSecurityTest {
         new UsernamePasswordAuthenticationToken(
             user, "token", Collections.singletonList(new SimpleGrantedAuthority("ROLE_MEMBER")));
 
+    assertThrows(AccessDeniedException.class, () -> controller.byMember(99L, auth));
+    verify(repository, never()).findByMemberId(anyLong());
+  }
+
+  @Test
+  void traineeCannotCheckInOrReadAnUnassignedMember() {
+    AuthenticatedUser user = new AuthenticatedUser(11L, "trainee@pulsefit.com", "TRAINEE", null);
+    Authentication auth =
+        new UsernamePasswordAuthenticationToken(
+            user, "token", Collections.singletonList(new SimpleGrantedAuthority("ROLE_TRAINEE")));
+    when(assignments.assigned("trainee@pulsefit.com", 99L))
+        .thenReturn(new TraineeAssignmentClient.AssignmentCheck(false));
+    assertThrows(AccessDeniedException.class, () -> controller.checkIn(new CheckInRequest(99L, 1L), auth));
     assertThrows(AccessDeniedException.class, () -> controller.byMember(99L, auth));
     verify(repository, never()).findByMemberId(anyLong());
   }

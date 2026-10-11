@@ -59,15 +59,15 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="plans" element={<Plans />} />
-        <Route path="checkout/result" element={<CheckoutResult />} />
-        <Route path="checkout/:planId" element={<Checkout />} />
+        <Route path="checkout/result" element={<RequireRole roles={['MEMBER']}><CheckoutResult /></RequireRole>} />
+        <Route path="checkout/:planId" element={<RequireRole roles={['MEMBER']}><Checkout /></RequireRole>} />
         <Route path="members" element={<Members />} />
         <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="facilities" element={<Facilities />} />
-        <Route path="payments" element={<Payments />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="trainers" element={<Trainers />} />
+        <Route path="payments" element={<RequireRole roles={['MEMBER', 'STAFF', 'ADMIN']}><Payments /></RequireRole>} />
+        <Route path="notifications" element={<RequireRole roles={['MEMBER', 'STAFF', 'ADMIN']}><Notifications /></RequireRole>} />
+        <Route path="trainers" element={<RequireRole roles={['MEMBER', 'STAFF', 'ADMIN']}><Trainers /></RequireRole>} />
         <Route path="reports" element={<RequireRole roles={['STAFF', 'ADMIN']}><Reports /></RequireRole>} />
         <Route path="invitations" element={<RequireRole roles={['ADMIN']}><Invitations /></RequireRole>} />
         <Route path="team" element={<RequireRole roles={['ADMIN']}><Team /></RequireRole>} />

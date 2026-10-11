@@ -47,17 +47,27 @@ export default function Layout() {
     return () => clearInterval(id);
   }, [expiresAt]);
 
-  const links = [
-    { to: '/', label: 'Overview', icon: 'overview', end: true },
-    { to: '/plans', label: 'Plans', icon: 'plans' },
-    { to: '/members', label: user?.role === 'MEMBER' ? 'My profile' : 'Members', icon: 'members' },
-    { to: '/subscriptions', label: 'Subscriptions', icon: 'subs' },
-    { to: '/attendance', label: 'Attendance', icon: 'check' },
-    { to: '/facilities', label: 'Facilities', icon: 'facility' },
-    { to: '/payments', label: 'Payments', icon: 'pay' },
-    { to: '/notifications', label: 'Notifications', icon: 'bell' },
-    { to: '/trainers', label: 'Trainers', icon: 'trainer' },
-  ];
+  const trainee = user?.role === 'TRAINEE';
+  const links = trainee
+    ? [
+        { to: '/', label: 'Overview', icon: 'overview', end: true },
+        { to: '/members', label: 'Members', icon: 'members' },
+        { to: '/subscriptions', label: 'Subscriptions', icon: 'subs' },
+        { to: '/attendance', label: 'Attendance', icon: 'check' },
+        { to: '/plans', label: 'Plans', icon: 'plans' },
+        { to: '/facilities', label: 'Facilities', icon: 'facility' },
+      ]
+    : [
+        { to: '/', label: 'Overview', icon: 'overview', end: true },
+        { to: '/plans', label: 'Plans', icon: 'plans' },
+        { to: '/members', label: user?.role === 'MEMBER' ? 'My profile' : 'Members', icon: 'members' },
+        { to: '/subscriptions', label: 'Subscriptions', icon: 'subs' },
+        { to: '/attendance', label: 'Attendance', icon: 'check' },
+        { to: '/facilities', label: 'Facilities', icon: 'facility' },
+        { to: '/payments', label: 'Payments', icon: 'pay' },
+        { to: '/notifications', label: 'Notifications', icon: 'bell' },
+        { to: '/trainers', label: 'Trainers', icon: 'trainer' },
+      ];
   if (user?.role === 'STAFF' || user?.role === 'ADMIN') {
     links.push({ to: '/reports', label: 'Reports', icon: 'chart' });
   }

@@ -9,6 +9,7 @@ const EMPTY = { name: '', email: '', contact: '', dateOfBirth: '', status: 'ACTI
 export default function Members() {
   const { user } = useAuth();
   const isMember = user?.role === 'MEMBER';
+  const trainee = user?.role === 'TRAINEE';
   const canManage = user?.role === 'STAFF' || user?.role === 'ADMIN';
   const isAdmin = user?.role === 'ADMIN';
   const [rows, setRows] = useState([]);
@@ -24,7 +25,16 @@ export default function Members() {
     setLoading(true);
     setError('');
     try {
-      if (isMember) {
+      if (trainee) {
+        const roster = await api('/api/trainers/me/roster');
+        setRows((roster.members || []).map((member) => ({
+          id: member.memberId,
+          name: member.name,
+          email: member.email,
+          contact: member.contact,
+          status: member.status,
+        })));
+      } else if (isMember) {
         if (!user.memberId) {
           setRows([]);
           return;
@@ -120,7 +130,7 @@ export default function Members() {
       <PageHeader
         eyebrow="People"
         title={isMember ? 'My profile' : 'Members'}
-        text={isMember ? 'You can update only the profile linked to this account.' : 'Adding a member saves the profile. An administrator also emails that person a link to choose a password.'}
+        text={trainee ? 'Members assigned to you. Profiles, plans, and attendance are read-only.' : isMember ? 'You can update only the profile linked to this account.' : 'Adding a member saves the profile. An administrator also emails that person a link to choose a password.'}
         actions={canManage ? <Button onClick={openCreate}>Add member</Button> : null}
       />
       <Alert>{error}</Alert>
@@ -164,7 +174,7 @@ export default function Members() {
                   <td><Badge tone={statusTone(member.status)}>{member.status}</Badge></td>
                   <td>{formatDate(member.dateOfBirth)}</td>
                   <td className="actions">
-                    <Button variant="secondary" onClick={() => openEdit(member)}>Edit</Button>
+                    {trainee ? null : <Button variant="secondary" onClick={() => openEdit(member)}>Edit</Button>}
                     {isAdmin ? <Button variant="danger" onClick={() => remove(member)}>Delete</Button> : null}
                   </td>
                 </tr>

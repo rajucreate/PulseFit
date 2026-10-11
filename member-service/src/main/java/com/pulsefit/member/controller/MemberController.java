@@ -1,8 +1,11 @@
 package com.pulsefit.member.controller;
 
+import com.pulsefit.member.client.TraineeAssignmentClient;
+import com.pulsefit.member.client.TraineeAssignmentClient.AssignmentCheck;
 import com.pulsefit.member.dto.*;
 import com.pulsefit.member.security.AuthenticatedUser;
 import com.pulsefit.member.service.MemberService;
+import feign.FeignException;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -15,9 +18,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/members")
 public class MemberController {
   private final MemberService service;
+  private final TraineeAssignmentClient assignments;
 
-  public MemberController(MemberService service) {
+  public MemberController(MemberService service, TraineeAssignmentClient assignments) {
     this.service = service;
+    this.assignments = assignments;
   }
 
   @PostMapping
@@ -57,6 +62,23 @@ public class MemberController {
 
   private void enforceOwnership(Long targetMemberId, Authentication authentication, String action) {
     if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      if ("TRAINEE".equalsIgnoreCase(user.role())) {
+        if (!"access".equals(action)) {
+          throw new AccessDeniedException("Trainees cannot change member profiles.");
+        }
+        if (user.email() == null || user.email().isBlank() || assignments == null) {
+          throw new AccessDeniedException("This member is not assigned to you.");
+        }
+        try {
+          AssignmentCheck check = assignments.assigned(user.email(), targetMemberId);
+          if (check == null || !check.assigned()) {
+            throw new AccessDeniedException("This member is not assigned to you.");
+          }
+        } catch (FeignException ex) {
+          throw new AccessDeniedException("This member is not assigned to you.");
+        }
+        return;
+      }
       if ("MEMBER".equalsIgnoreCase(user.role())) {
         if (user.memberId() == null || !user.memberId().equals(targetMemberId)) {
           throw new AccessDeniedException(
