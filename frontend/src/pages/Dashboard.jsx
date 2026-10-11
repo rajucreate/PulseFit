@@ -24,6 +24,11 @@ export default function Dashboard() {
       setError('');
       try {
         const plans = await api('/api/plans');
+        if (user.role === 'TRAINEE') {
+          const roster = await api('/api/trainers/me/roster');
+          if (!ignore) setData({ plans, roster, traineeView: true });
+          return;
+        }
         if (user.role === 'MEMBER') {
           if (!user.memberId) {
             if (!ignore) setData({ plans, memberView: true, unlinked: true });
@@ -77,9 +82,85 @@ export default function Dashboard() {
           <Link className="btn btn-primary" to="/plans">Browse plans</Link>
         </div>
       ) : null}
+      {!loading && data?.traineeView ? <TraineeHome data={data} /> : null}
       {!loading && data?.memberView && !data.unlinked ? <MemberHome data={data} /> : null}
-      {!loading && data && !data.memberView ? <DeskHome data={data} /> : null}
+      {!loading && data && !data.memberView && !data.traineeView ? <DeskHome data={data} /> : null}
     </div>
+  );
+}
+
+function currentPlan(subscriptions) {
+  const today = new Date().toISOString().slice(0, 10);
+  return (subscriptions || []).find((item) => item.status === 'ACTIVE' && String(item.expiryDate) >= today)
+    || (subscriptions || []).find((item) => item.status === 'ACTIVE')
+    || null;
+}
+
+function TraineeHome({ data }) {
+  const members = data.roster?.members || [];
+  const visits = members.flatMap((member) => (member.attendance || []).map((visit) => ({ ...visit, memberId: member.memberId, memberName: member.name })));
+  const recent = byRecent(visits, 'checkInTime').slice(0, 8);
+  return (
+    <>
+      <section className="stat-grid">
+        <article className="stat highlight">
+          <p>Assigned members</p>
+          <strong>{members.length}</strong>
+          <span>linked to this trainee</span>
+        </article>
+        <article className="stat">
+          <p>Active memberships</p>
+          <strong>{members.filter((member) => currentPlan(member.subscriptions)).length}</strong>
+        </article>
+        <article className="stat">
+          <p>Recent check-ins</p>
+          <strong>{recent.length}</strong>
+        </article>
+      </section>
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Assigned members</h2>
+          <Link to="/members">Open list</Link>
+        </div>
+        {members.length === 0 ? <p className="muted">No members are assigned to this trainee yet.</p> : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Plan</th>
+                  <th>Window</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => {
+                  const plan = currentPlan(member.subscriptions);
+                  return (
+                    <tr key={member.memberId}>
+                      <td>
+                        <strong>{member.name}</strong>
+                        <div className="muted">#{member.memberId} · {member.email}</div>
+                      </td>
+                      <td>{plan ? `${plan.planName || `Plan ${plan.planId}`}${plan.durationInDays ? ` · ${plan.durationInDays} days` : ''}` : 'None'}</td>
+                      <td>{plan ? `${formatDate(plan.startDate)} – ${formatDate(plan.expiryDate)}` : '—'}</td>
+                      <td><Badge tone={statusTone(plan?.status || member.status)}>{plan?.status || member.status || '—'}</Badge></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Recent check-ins</h2>
+          <Link to="/attendance">Attendance</Link>
+        </div>
+        {recent.length === 0 ? <p className="muted">No check-ins for assigned members yet.</p> : <VisitList visits={recent} showMember />}
+      </section>
+    </>
   );
 }
 
@@ -185,7 +266,7 @@ function VisitList({ visits, showMember = false }) {
       {visits.map((visit) => (
         <li key={visit.id}>
           <div>
-            <strong>{showMember ? `Member ${visit.memberId}` : 'Check-in'}</strong>
+            <strong>{showMember ? (visit.memberName || `Member ${visit.memberId}`) : 'Check-in'}</strong>
             <span>{formatDateTime(visit.checkInTime)} · Facility {visit.facilityId}</span>
           </div>
           <Badge tone={statusTone(visit.accessStatus)}>{visit.accessStatus}</Badge>

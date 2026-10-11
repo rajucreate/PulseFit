@@ -3,6 +3,7 @@ package com.pulsefit.member;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.pulsefit.member.client.TraineeAssignmentClient;
 import com.pulsefit.member.controller.MemberController;
 import com.pulsefit.member.dto.MemberRequest;
 import com.pulsefit.member.dto.MemberResponse;
@@ -28,13 +29,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 class MemberOwnershipSecurityTest {
 
   @Mock private MemberRepository memberRepository;
+  @Mock private TraineeAssignmentClient assignments;
   private MemberService memberService;
   private MemberController memberController;
 
   @BeforeEach
   void setUp() {
     memberService = new MemberService(memberRepository);
-    memberController = new MemberController(memberService);
+    memberController = new MemberController(memberService, assignments);
   }
 
   @Test

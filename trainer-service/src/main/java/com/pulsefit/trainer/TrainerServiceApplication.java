@@ -8,7 +8,12 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication
 @EnableDiscoveryClient
-@EnableFeignClients(clients = {RemoteClients.FacilityClient.class, RemoteClients.MemberClient.class})
+@EnableFeignClients(clients = {
+  RemoteClients.FacilityClient.class,
+  RemoteClients.MemberClient.class,
+  RemoteClients.SubscriptionClient.class,
+  RemoteClients.AttendanceClient.class
+})
 public class TrainerServiceApplication {
   public static void main(String[] args) {
     SpringApplication.run(TrainerServiceApplication.class, args);

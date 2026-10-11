@@ -1,6 +1,7 @@
 package com.pulsefit.trainer.controller;
 
 import com.pulsefit.trainer.dto.TrainerDtos.AssignmentResponse;
+import com.pulsefit.trainer.dto.TrainerDtos.RosterResponse;
 import com.pulsefit.trainer.dto.TrainerDtos.TrainerRequest;
 import com.pulsefit.trainer.dto.TrainerDtos.TrainerResponse;
 import com.pulsefit.trainer.model.TrainerStatus;
@@ -34,6 +35,13 @@ public class TrainerController {
   @GetMapping("/facility/{facilityId}")
   public List<TrainerResponse> byFacility(@PathVariable Long facilityId) {
     return service.byFacility(facilityId);
+  }
+
+  @GetMapping("/me/roster")
+  @PreAuthorize("hasRole('TRAINEE')")
+  public RosterResponse roster(Authentication authentication) {
+    AuthenticatedUser user = requireUser(authentication);
+    return service.roster(user.email());
   }
 
   @GetMapping("/member/{memberId}")
@@ -88,10 +96,23 @@ public class TrainerController {
 
   private void enforceMember(Long memberId, Authentication authentication) {
     if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      if ("TRAINEE".equalsIgnoreCase(user.role())) {
+        if (!service.isAssigned(user.email(), memberId)) {
+          throw new AccessDeniedException("This member is not assigned to you.");
+        }
+        return;
+      }
       if ("MEMBER".equalsIgnoreCase(user.role())
           && (user.memberId() == null || !user.memberId().equals(memberId))) {
         throw new AccessDeniedException("Access denied: you can only view your own trainer.");
       }
     }
+  }
+
+  private AuthenticatedUser requireUser(Authentication authentication) {
+    if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      return user;
+    }
+    throw new AccessDeniedException("Sign in to view assigned members.");
   }
 }

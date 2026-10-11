@@ -1,8 +1,11 @@
 package com.pulsefit.attendance.controller;
 
+import com.pulsefit.attendance.client.TraineeAssignmentClient;
+import com.pulsefit.attendance.client.TraineeAssignmentClient.AssignmentCheck;
 import com.pulsefit.attendance.dto.*;
 import com.pulsefit.attendance.security.AuthenticatedUser;
 import com.pulsefit.attendance.service.AttendanceService;
+import feign.FeignException;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -15,15 +18,22 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/attendance")
 public class AttendanceController {
   private final AttendanceService service;
+  private final TraineeAssignmentClient assignments;
 
-  public AttendanceController(AttendanceService service) {
+  public AttendanceController(AttendanceService service, TraineeAssignmentClient assignments) {
     this.service = service;
+    this.assignments = assignments;
   }
 
   @PostMapping("/check-in")
   @ResponseStatus(HttpStatus.CREATED)
   public AttendanceResponse checkIn(
       @Valid @RequestBody CheckInRequest r, Authentication authentication) {
+    if (authentication != null
+        && authentication.getPrincipal() instanceof AuthenticatedUser user
+        && "TRAINEE".equalsIgnoreCase(user.role())) {
+      throw new AccessDeniedException("Trainees cannot create or change attendance records.");
+    }
     enforceMemberIdOwnership(r.memberId(), authentication, "check in for");
     return service.checkIn(r);
   }
@@ -51,6 +61,20 @@ public class AttendanceController {
   private void enforceMemberIdOwnership(
       Long targetMemberId, Authentication authentication, String action) {
     if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
+      if ("TRAINEE".equalsIgnoreCase(user.role())) {
+        if (user.email() == null || user.email().isBlank() || assignments == null) {
+          throw new AccessDeniedException("This member is not assigned to you.");
+        }
+        try {
+          AssignmentCheck check = assignments.assigned(user.email(), targetMemberId);
+          if (check == null || !check.assigned()) {
+            throw new AccessDeniedException("This member is not assigned to you.");
+          }
+        } catch (FeignException ex) {
+          throw new AccessDeniedException("This member is not assigned to you.");
+        }
+        return;
+      }
       if ("MEMBER".equalsIgnoreCase(user.role())) {
         if (user.memberId() == null || !user.memberId().equals(targetMemberId)) {
           throw new AccessDeniedException(

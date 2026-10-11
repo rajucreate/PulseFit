@@ -8,6 +8,7 @@ import { addDays, formatDate } from '../format';
 export default function Subscriptions() {
   const { user } = useAuth();
   const desk = user?.role === 'STAFF' || user?.role === 'ADMIN';
+  const trainee = user?.role === 'TRAINEE';
   const isAdmin = user?.role === 'ADMIN';
   const [rows, setRows] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -29,6 +30,16 @@ export default function Subscriptions() {
           return;
         }
         setRows(await api(`/api/subscriptions/member/${user.memberId}`));
+        return;
+      }
+      if (user.role === 'TRAINEE') {
+        const roster = await api('/api/trainers/me/roster');
+        const assigned = roster.members || [];
+        setMembers(assigned.map((member) => ({ id: member.memberId, name: member.name })));
+        const lists = await Promise.all(
+          assigned.map((member) => api(`/api/subscriptions/member/${member.memberId}`)),
+        );
+        setRows(lists.flat());
         return;
       }
       const [subs, memberList] = await Promise.all([api('/api/subscriptions'), api('/api/members')]);
@@ -104,13 +115,13 @@ export default function Subscriptions() {
       <PageHeader
         eyebrow="Billing"
         title="Subscriptions"
-        text="A subscription is valid when it is active and today falls inside the start and expiry dates."
-        actions={<Link className="btn btn-primary" to="/plans">Choose a plan</Link>}
+        text={trainee ? 'Read-only membership history for members assigned to you.' : 'A subscription is valid when it is active and today falls inside the start and expiry dates.'}
+        actions={user.role === 'MEMBER' ? <Link className="btn btn-primary" to="/plans">Choose a plan</Link> : null}
       />
       <Alert>{error}</Alert>
       {loading ? <Spinner label="Loading subscriptions" /> : null}
       {!loading && rows.length === 0 ? (
-        <Empty title="No subscriptions" text="Choose a plan and set the membership window." />
+        <Empty title="No subscriptions" text={trainee ? 'Assigned members do not have a membership yet.' : 'Choose a plan and set the membership window.'} />
       ) : null}
       {!loading && rows.length > 0 ? (
         <div className="table-wrap">
@@ -127,7 +138,7 @@ export default function Subscriptions() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td>{desk ? memberName(row.memberId) : `You · #${row.memberId}`}</td>
+                  <td>{desk || trainee ? memberName(row.memberId) : `You · #${row.memberId}`}</td>
                   <td>{planName(row.planId)}</td>
                   <td>{formatDate(row.startDate)} – {formatDate(row.expiryDate)}</td>
                   <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>

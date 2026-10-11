@@ -47,7 +47,7 @@ class TrainerServiceTest {
   void duplicateAssignmentIsRejected() {
     Trainer trainer = new Trainer("Ada", "Strength", 5, 1L, "Mornings", TrainerStatus.ACTIVE);
     when(trainers.findById(8L)).thenReturn(Optional.of(trainer));
-    when(members.get(3L)).thenReturn(new MemberView(3L, "Ann", "a@b.com", "ACTIVE"));
+    when(members.get(3L)).thenReturn(new MemberView(3L, "Ann", "a@b.com", "555", "ACTIVE"));
     when(assignments.findByTrainerIdAndMemberId(8L, 3L)).thenReturn(Optional.of(mock()));
     assertThrows(ConflictException.class, () -> service.assign(8L, 3L));
   }

@@ -12,6 +12,9 @@ public class Trainer {
   @Column(nullable = false)
   private String name;
 
+  @Column(unique = true)
+  private String email;
+
   @Column(nullable = false)
   private String specialization;
 
@@ -47,6 +50,11 @@ public class Trainer {
 
   public Long getId() { return id; }
   public String getName() { return name; }
+  public String getEmail() { return email; }
+
+  public void attachEmail(String email) {
+    this.email = email == null ? null : email.trim().toLowerCase();
+  }
   public String getSpecialization() { return specialization; }
   public Integer getExperienceYears() { return experienceYears; }
   public Long getFacilityId() { return facilityId; }

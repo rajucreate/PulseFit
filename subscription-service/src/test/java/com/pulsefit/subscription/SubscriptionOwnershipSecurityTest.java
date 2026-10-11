@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.pulsefit.subscription.client.MemberClient;
+import com.pulsefit.subscription.client.TraineeAssignmentClient;
 import com.pulsefit.subscription.controller.SubscriptionController;
 import com.pulsefit.subscription.dto.SubscriptionRequest;
 import com.pulsefit.subscription.dto.SubscriptionResponse;
@@ -35,6 +36,7 @@ class SubscriptionOwnershipSecurityTest {
   @Mock private SubscriptionRepository repository;
   @Mock private MembershipPlanRepository planRepository;
   @Mock private MemberClient memberClient;
+  @Mock private TraineeAssignmentClient assignments;
 
   private SubscriptionService subscriptionService;
   private SubscriptionController controller;
@@ -42,7 +44,7 @@ class SubscriptionOwnershipSecurityTest {
   @BeforeEach
   void setUp() {
     subscriptionService = new SubscriptionService(repository, new PlanService(planRepository), memberClient);
-    controller = new SubscriptionController(subscriptionService);
+    controller = new SubscriptionController(subscriptionService, assignments);
   }
 
   @Test
@@ -116,6 +118,23 @@ class SubscriptionOwnershipSecurityTest {
 
     assertThrows(AccessDeniedException.class, () -> controller.create(req, auth));
     verify(repository, never()).save(any(Subscription.class));
+  }
+
+  @Test
+  void traineeCannotCreateOrReadAnUnassignedMember() {
+    AuthenticatedUser user = new AuthenticatedUser(11L, "trainee@pulsefit.com", "TRAINEE", null);
+    Authentication auth =
+        new UsernamePasswordAuthenticationToken(
+            user, "token", Collections.singletonList(new SimpleGrantedAuthority("ROLE_TRAINEE")));
+    when(assignments.assigned("trainee@pulsefit.com", 99L))
+        .thenReturn(new TraineeAssignmentClient.AssignmentCheck(false));
+    SubscriptionRequest req =
+        new SubscriptionRequest(
+            99L, 2L, LocalDate.now(), LocalDate.now().plusDays(30), SubscriptionStatus.PENDING);
+    assertThrows(AccessDeniedException.class, () -> controller.create(req, auth));
+    assertThrows(AccessDeniedException.class, () -> controller.byMember(99L, auth));
+    verify(repository, never()).save(any(Subscription.class));
+    verify(repository, never()).findByMemberId(anyLong());
   }
 }
 
