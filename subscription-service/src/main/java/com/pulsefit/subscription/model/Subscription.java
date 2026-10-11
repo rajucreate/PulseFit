@@ -65,6 +65,14 @@ public class Subscription {
     return status;
   }
 
+  public void activate() {
+    this.status = SubscriptionStatus.ACTIVE;
+  }
+
+  public void cancel() {
+    this.status = SubscriptionStatus.CANCELLED;
+  }
+
   public void update(
       Long memberId, Long planId, LocalDate start, LocalDate expiry, SubscriptionStatus status) {
     this.memberId = memberId;

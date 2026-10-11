@@ -5,6 +5,12 @@ import { useAuth } from '../auth';
 import { Alert, Badge, PageHeader, Spinner, statusTone } from '../components/ui';
 import { byRecent, displayName, formatDate, formatDateTime, isToday } from '../format';
 
+function optional(path) {
+  return api(path)
+    .then((data) => ({ available: true, data }))
+    .catch((err) => ({ available: false, error: errorText(err) }));
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -23,14 +29,17 @@ export default function Dashboard() {
             if (!ignore) setData({ plans, memberView: true, unlinked: true });
             return;
           }
-          const [member, subscriptions, visits, validity] = await Promise.all([
+          const [member, subscriptions, visits, validity, payments, notes, trainers] = await Promise.all([
             api(`/api/members/${user.memberId}`),
             api(`/api/subscriptions/member/${user.memberId}`),
             api(`/api/attendance/member/${user.memberId}`),
             api(`/api/subscriptions/member/${user.memberId}/valid`),
+            optional(`/api/payments/member/${user.memberId}`),
+            optional(`/api/notifications/member/${user.memberId}`),
+            optional(`/api/trainers/member/${user.memberId}`),
           ]);
           if (!ignore) {
-            setData({ plans, member, subscriptions, visits, validity, memberView: true });
+            setData({ plans, member, subscriptions, visits, validity, payments, notes, trainers, memberView: true });
           }
           return;
         }
@@ -105,7 +114,27 @@ function MemberHome({ data }) {
         </div>
         {recent.length === 0 ? <p className="muted">No visits recorded yet.</p> : <VisitList visits={recent} />}
       </section>
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Account activity</h2>
+          <Link to="/payments">Payments</Link>
+        </div>
+        <Extra label="Payments" section={data.payments} empty="No payments yet." render={(rows) => rows.slice(0, 3).map((row) => <p key={row.id}>{row.paymentStatus} · {row.transactionId}</p>)} />
+        <Extra label="Notifications" section={data.notes} empty="No notices yet." render={(rows) => rows.slice(0, 3).map((row) => <p key={row.id}>{row.subject} · {row.status}</p>)} />
+        <Extra label="Trainer" section={data.trainers} empty="No trainer assigned." render={(rows) => rows.map((row) => <p key={row.id}>Trainer #{row.trainerId}</p>)} />
+      </section>
     </>
+  );
+}
+
+function Extra({ label, section, empty, render }) {
+  return (
+    <div>
+      <p className="eyebrow">{label}</p>
+      {!section?.available ? <p className="muted">{section?.error || 'Unavailable'}</p> : null}
+      {section?.available && section.data.length === 0 ? <p className="muted">{empty}</p> : null}
+      {section?.available ? render(section.data) : null}
+    </div>
   );
 }
 
@@ -126,8 +155,23 @@ function DeskHome({ data }) {
       </section>
       <section className="panel">
         <div className="panel-head">
+          <h2>Club operations</h2>
+        </div>
+        <div className="row">
+          <Link to="/facilities">Facilities</Link>
+          <Link to="/trainers">Trainers</Link>
+          <Link to="/payments">Payments</Link>
+          <Link to="/notifications">Notifications</Link>
+          <Link to="/reports">Reports</Link>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-head">
           <h2>Latest access log</h2>
-          <Link to="/attendance">Open attendance</Link>
+          <div className="row">
+            <Link to="/attendance">Open attendance</Link>
+            <Link to="/reports">Open reports</Link>
+          </div>
         </div>
         {visits.length === 0 ? <p className="muted">No check-ins yet.</p> : <VisitList visits={byRecent(visits, 'checkInTime').slice(0, 8)} showMember />}
       </section>

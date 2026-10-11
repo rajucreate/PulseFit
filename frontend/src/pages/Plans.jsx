@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, errorText } from '../api';
 import { useAuth } from '../auth';
 import { Alert, Badge, Button, Empty, Field, Modal, PageHeader, Spinner } from '../components/ui';
-import { formatMoney } from '../format';
+import { formatDate, todayISO } from '../format';
 
 const EMPTY = {
   planName: '',
@@ -20,12 +21,20 @@ export default function Plans() {
   const [error, setError] = useState('');
   const [form, setForm] = useState(null);
   const [pending, setPending] = useState(false);
+  const [current, setCurrent] = useState(null);
 
   async function load() {
     setLoading(true);
     setError('');
     try {
       setPlans(await api('/api/plans'));
+      if (user?.role === 'MEMBER' && user.memberId) {
+        const rows = await api(`/api/subscriptions/member/${user.memberId}`);
+        const today = todayISO();
+        setCurrent(rows.find((row) => row.status === 'ACTIVE' && String(row.expiryDate) >= today) || null);
+      } else {
+        setCurrent(null);
+      }
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -35,7 +44,7 @@ export default function Plans() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [user]);
 
   function openCreate() {
     setForm({ mode: 'create', ...EMPTY });
@@ -96,6 +105,14 @@ export default function Plans() {
         actions={isAdmin ? <Button onClick={openCreate}>New plan</Button> : null}
       />
       <Alert>{error}</Alert>
+      {current ? (
+        <section className="panel">
+          <h2>Current membership</h2>
+          <p>
+            {plans.find((plan) => plan.id === current.planId)?.planName || `Plan ${current.planId}`} · {formatDate(current.startDate)} to {formatDate(current.expiryDate)} · {Math.max(0, Math.round((new Date(`${current.expiryDate}T00:00:00`) - new Date(`${todayISO()}T00:00:00`)) / 86400000))} days remaining. A new plan can be purchased after it expires.
+          </p>
+        </section>
+      ) : null}
       {loading ? <Spinner label="Loading plans" /> : null}
       {!loading && plans.length === 0 ? (
         <Empty title="No plans yet" text="An admin can publish the first membership plan." />
@@ -108,8 +125,15 @@ export default function Plans() {
               <span className="muted">#{plan.id}</span>
             </div>
             <h2>{plan.planName}</h2>
-            <p className="price">{formatMoney(plan.price)}<span> / {plan.durationInDays} days</span></p>
+            <p className="price">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(plan.price))}<span> / {plan.durationInDays} days</span></p>
             <p className="lede">{plan.description || 'Standard club access.'}</p>
+            {user?.role === 'MEMBER' && plan.active ? (
+              current ? (
+                <p className="muted">Purchase is unavailable while this membership is unexpired.</p>
+              ) : (
+                <Link className="btn btn-primary" to={`/checkout/${plan.id}`}>Continue to checkout</Link>
+              )
+            ) : null}
             {isAdmin ? (
               <div className="row">
                 <Button variant="secondary" onClick={() => openEdit(plan)}>Edit</Button>

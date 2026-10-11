@@ -26,7 +26,7 @@ class AttendanceServiceTest {
     when(subscriptions.validity(1L)).thenReturn(new SubscriptionValidity(1L, true, 42L));
     when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
     AttendanceResponse response =
-        new AttendanceService(repository, subscriptions).checkIn(new CheckInRequest(1L, 10L));
+        new AttendanceService(repository, subscriptions, null, null, null).checkIn(new CheckInRequest(1L, 10L));
     assertEquals(AccessStatus.GRANTED, response.accessStatus());
     assertEquals(42L, response.subscriptionId());
     assertNull(response.denialReason());
@@ -37,7 +37,7 @@ class AttendanceServiceTest {
     when(subscriptions.validity(1L)).thenReturn(new SubscriptionValidity(1L, false, null));
     when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
     AttendanceResponse response =
-        new AttendanceService(repository, subscriptions).checkIn(new CheckInRequest(1L, 10L));
+        new AttendanceService(repository, subscriptions, null, null, null).checkIn(new CheckInRequest(1L, 10L));
     assertEquals(AccessStatus.DENIED, response.accessStatus());
     assertNull(response.subscriptionId());
     assertEquals("No valid active subscription", response.denialReason());

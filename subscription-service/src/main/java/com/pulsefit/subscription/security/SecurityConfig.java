@@ -31,6 +31,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/subscriptions/member/*/valid")
                     .permitAll()
+                    .requestMatchers("/api/subscriptions/internal/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

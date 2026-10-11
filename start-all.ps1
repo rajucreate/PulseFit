@@ -104,7 +104,12 @@ foreach ($pair in @(
   @{ n = 'member-service'; p = 8081 },
   @{ n = 'auth-service'; p = 8084 },
   @{ n = 'subscription-service'; p = 8082 },
-  @{ n = 'attendance-service'; p = 8083 }
+  @{ n = 'attendance-service'; p = 8083 },
+  @{ n = 'facility-service'; p = 8085 },
+  @{ n = 'payment-service'; p = 8086 },
+  @{ n = 'notification-service'; p = 8087 },
+  @{ n = 'trainer-service'; p = 8088 },
+  @{ n = 'reporting-service'; p = 8089 }
 )) {
   $r = Start-PulseService $pair.n $pair.p
   if ($r) { $records += $r }
@@ -115,6 +120,11 @@ Wait-Port 8081 'Member'
 Wait-Port 8084 'Auth'
 Wait-Port 8082 'Subscription'
 Wait-Port 8083 'Attendance'
+Wait-Port 8085 'Facility'
+Wait-Port 8086 'Payment'
+Wait-Port 8087 'Notification'
+Wait-Port 8088 'Trainer'
+Wait-Port 8089 'Reporting'
 
 $r = Start-PulseService 'api-gateway' 8080
 if ($r) { $records += $r }
@@ -135,7 +145,12 @@ $known = @(
   @{ n = 'member-service'; p = 8081 },
   @{ n = 'subscription-service'; p = 8082 },
   @{ n = 'attendance-service'; p = 8083 },
-  @{ n = 'auth-service'; p = 8084 }
+  @{ n = 'auth-service'; p = 8084 },
+  @{ n = 'facility-service'; p = 8085 },
+  @{ n = 'payment-service'; p = 8086 },
+  @{ n = 'notification-service'; p = 8087 },
+  @{ n = 'trainer-service'; p = 8088 },
+  @{ n = 'reporting-service'; p = 8089 }
 )
 foreach ($k in $known) {
   if (-not ($all | Where-Object { $_.name -eq $k.n })) {

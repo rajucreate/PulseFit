@@ -9,6 +9,7 @@ import com.pulsefit.subscription.client.MemberClientResponse;
 import com.pulsefit.subscription.dto.SubscriptionRequest;
 import com.pulsefit.subscription.dto.SubscriptionResponse;
 import com.pulsefit.subscription.dto.ValidityResponse;
+import com.pulsefit.subscription.exception.ConflictException;
 import com.pulsefit.subscription.exception.ResourceNotFoundException;
 import com.pulsefit.subscription.model.*;
 import com.pulsefit.subscription.repository.MembershipPlanRepository;
@@ -117,9 +118,25 @@ class SubscriptionServiceTest {
                     2L,
                     LocalDate.now(),
                     LocalDate.now().plusDays(30),
-                    SubscriptionStatus.ACTIVE));
+                    SubscriptionStatus.CANCELLED));
     assertNotNull(response);
     assertEquals(1L, response.memberId());
+  }
+
+  @Test
+  void createActiveSubscriptionIsRejectedUntilPayment() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            service()
+                .create(
+                    new SubscriptionRequest(
+                        1L,
+                        2L,
+                        LocalDate.now(),
+                        LocalDate.now().plusDays(30),
+                        SubscriptionStatus.ACTIVE)));
+    verify(repository, never()).save(any());
   }
 
   @Test
@@ -141,7 +158,7 @@ class SubscriptionServiceTest {
                         2L,
                         LocalDate.now(),
                         LocalDate.now().plusDays(30),
-                        SubscriptionStatus.ACTIVE)));
+                        SubscriptionStatus.PENDING)));
   }
 
   @Test
@@ -163,7 +180,7 @@ class SubscriptionServiceTest {
                         2L,
                         LocalDate.now(),
                         LocalDate.now().plusDays(30),
-                        SubscriptionStatus.ACTIVE)));
+                        SubscriptionStatus.PENDING)));
   }
 
   @Test
@@ -175,14 +192,14 @@ class SubscriptionServiceTest {
             new MemberClientResponse(
                 1L, "Rex", "rex@example.com", "123", LocalDate.now(), "ACTIVE", OffsetDateTime.now()));
     Subscription saved =
-        new Subscription(1L, 2L, LocalDate.now(), LocalDate.now(), SubscriptionStatus.ACTIVE);
+        new Subscription(1L, 2L, LocalDate.now(), LocalDate.now(), SubscriptionStatus.PENDING);
     when(repository.save(any(Subscription.class))).thenReturn(saved);
 
     SubscriptionResponse response =
         service()
             .create(
                 new SubscriptionRequest(
-                    1L, 2L, LocalDate.now(), LocalDate.now(), SubscriptionStatus.ACTIVE));
+                    1L, 2L, LocalDate.now(), LocalDate.now(), SubscriptionStatus.PENDING));
     assertNotNull(response);
   }
 
@@ -198,6 +215,63 @@ class SubscriptionServiceTest {
                         2L,
                         LocalDate.now().plusDays(10),
                         LocalDate.now(),
-                        SubscriptionStatus.ACTIVE)));
+                        SubscriptionStatus.PENDING)));
+  }
+
+  @Test
+  void unexpiredMembershipBlocksAnotherPlan() {
+    MembershipPlan plan = new MembershipPlan("Other", 30, BigDecimal.TEN, "desc", true);
+    when(planRepository.findById(8L)).thenReturn(Optional.of(plan));
+    when(memberClient.getById(1L))
+        .thenReturn(
+            new MemberClientResponse(
+                1L, "Rex", "rex@example.com", "123", LocalDate.now(), "ACTIVE", OffsetDateTime.now()));
+    when(repository.findByMemberId(1L))
+        .thenReturn(
+            List.of(
+                new Subscription(
+                    1L, 2L, LocalDate.now().minusDays(1), LocalDate.now().plusDays(10), SubscriptionStatus.ACTIVE)));
+
+    ConflictException ex =
+        assertThrows(ConflictException.class, () -> service().preparePurchase(1L, 8L));
+    assertTrue(ex.getMessage().contains(LocalDate.now().plusDays(10).toString()));
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  void expiredMembershipCanStartAPendingPurchase() {
+    MembershipPlan plan = new MembershipPlan("Other", 15, BigDecimal.TEN, "desc", true);
+    when(planRepository.findById(8L)).thenReturn(Optional.of(plan));
+    when(memberClient.getById(1L))
+        .thenReturn(
+            new MemberClientResponse(
+                1L, "Rex", "rex@example.com", "123", LocalDate.now(), "ACTIVE", OffsetDateTime.now()));
+    when(repository.findByMemberId(1L))
+        .thenReturn(
+            List.of(
+                new Subscription(
+                    1L, 2L, LocalDate.now().minusDays(20), LocalDate.now().minusDays(1), SubscriptionStatus.ACTIVE)));
+    when(repository.save(any(Subscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    SubscriptionResponse response = service().preparePurchase(1L, 8L);
+    assertEquals(SubscriptionStatus.PENDING, response.status());
+    verify(repository).lockMember(1L);
+  }
+
+  @Test
+  void pendingPurchaseIsReused() {
+    MembershipPlan plan = new MembershipPlan("Other", 15, BigDecimal.TEN, "desc", true);
+    when(planRepository.findById(8L)).thenReturn(Optional.of(plan));
+    when(memberClient.getById(1L))
+        .thenReturn(
+            new MemberClientResponse(
+                1L, "Rex", "rex@example.com", "123", LocalDate.now(), "ACTIVE", OffsetDateTime.now()));
+    Subscription pending =
+        new Subscription(1L, 8L, LocalDate.now(), LocalDate.now().plusDays(15), SubscriptionStatus.PENDING);
+    when(repository.findByMemberId(1L)).thenReturn(List.of(pending));
+
+    SubscriptionResponse response = service().preparePurchase(1L, 8L);
+    assertEquals(SubscriptionStatus.PENDING, response.status());
+    verify(repository, never()).save(any());
   }
 }

@@ -9,8 +9,15 @@ import Login from './pages/Login';
 import Members from './pages/Members';
 import Plans from './pages/Plans';
 import Register from './pages/Register';
+import Reports from './pages/Reports';
 import Subscriptions from './pages/Subscriptions';
 import Team from './pages/Team';
+import Trainers from './pages/Trainers';
+import Facilities from './pages/Facilities';
+import Notifications from './pages/Notifications';
+import Payments from './pages/Payments';
+import Checkout from './pages/Checkout';
+import CheckoutResult from './pages/CheckoutResult';
 
 function RequireAuth({ children }) {
   const { user } = useAuth();
@@ -46,9 +53,16 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="plans" element={<Plans />} />
+        <Route path="checkout/result" element={<CheckoutResult />} />
+        <Route path="checkout/:planId" element={<Checkout />} />
         <Route path="members" element={<Members />} />
         <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="attendance" element={<Attendance />} />
+        <Route path="facilities" element={<Facilities />} />
+        <Route path="payments" element={<Payments />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="trainers" element={<Trainers />} />
+        <Route path="reports" element={<RequireRole roles={['STAFF', 'ADMIN']}><Reports /></RequireRole>} />
         <Route path="team" element={<RequireRole roles={['ADMIN']}><Team /></RequireRole>} />
         <Route path="audit" element={<RequireRole roles={['ADMIN']}><Audit /></RequireRole>} />
       </Route>
