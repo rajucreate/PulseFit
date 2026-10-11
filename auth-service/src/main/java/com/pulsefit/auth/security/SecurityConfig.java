@@ -37,6 +37,9 @@ public class SecurityConfig {
                         "/api/auth/register",
                         "/api/auth/login",
                         "/api/auth/claim/**",
+                        "/api/auth/invitations/preview",
+                        "/api/auth/invitations/accept",
+                        "/api/auth/password/**",
                         "/api/auth/internal/**")
                     .permitAll()
                     .anyRequest()

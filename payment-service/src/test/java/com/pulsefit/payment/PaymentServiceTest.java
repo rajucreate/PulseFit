@@ -2,6 +2,7 @@ package com.pulsefit.payment;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import com.pulsefit.payment.client.Clients.NotificationClient;
@@ -168,25 +169,50 @@ class PaymentServiceTest {
 
   @Test
   void checkoutUsesPlanPriceAndDoesNotActivate() {
-    when(razorpay.configured()).thenReturn(true);
-    when(razorpay.keyId()).thenReturn("rzp_test_demo");
     when(subscriptions.prepare(new CheckoutCommand(3L, 2L)))
         .thenReturn(new SubscriptionView(9L, 3L, 2L, LocalDate.now(), LocalDate.now().plusDays(30), "PENDING"));
     when(plans.get(2L))
         .thenReturn(new PlanView(2L, "Monthly", 30, new BigDecimal("29.99"), "Standard", true));
     when(repository.findFirstBySubscriptionIdAndPaymentStatus(9L, PaymentStatus.PENDING))
         .thenReturn(Optional.empty());
-    when(razorpay.createOrder(2999, "sub_9"))
-        .thenReturn(new RazorpayGateway.RazorpayOrder("order_1", 2999, "created"));
     when(repository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
     var response = service.checkout(3L, 2L);
 
     assertEquals(2999, response.amountPaise());
-    assertEquals("order_1", response.orderId());
-    assertEquals("rzp_test_demo", response.keyId());
+    assertEquals(new BigDecimal("29.99"), response.amount());
+    assertTrue(response.orderId().startsWith("demo-"));
+    assertNull(response.keyId());
     assertTrue(response.testMode());
     verify(subscriptions, never()).activate(any());
+    verify(razorpay, never()).createOrder(anyInt(), any());
+  }
+
+  @Test
+  void demoPayActivatesOnceAndIgnoresASecondClick() {
+    Payment payment =
+        new Payment(
+            3L,
+            9L,
+            new BigDecimal("29.99"),
+            "DEMO_CARD",
+            "demo-1",
+            PaymentStatus.PENDING,
+            java.time.OffsetDateTime.now(),
+            "demo-1",
+            true,
+            "demo");
+    setId(payment, 11L);
+    when(repository.findById(11L)).thenReturn(Optional.of(payment));
+    when(repository.save(payment)).thenReturn(payment);
+
+    PaymentResponse first = service.completeDemo(3L, 11L);
+    PaymentResponse second = service.completeDemo(3L, 11L);
+
+    assertEquals(PaymentStatus.SUCCESS, first.paymentStatus());
+    assertEquals("demo-1", second.transactionId());
+    verify(repository, times(1)).save(payment);
+    verify(subscriptions, times(2)).activate(9L);
   }
 
   private Payment pendingOrder() {

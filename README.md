@@ -105,8 +105,13 @@ CREATE DATABASE pulsefit_trainers;
 | GET | `/api/facilities` | Authenticated. Filters: `name`, `location`, `status` |
 | POST/PUT | `/api/facilities` | STAFF or ADMIN |
 | DELETE | `/api/facilities/{id}` | STAFF or ADMIN. Deactivates; does not delete the row |
-| POST | `/api/payments/checkout` | Signed-in account with a linked member id |
-| POST | `/api/payments/verify` | Same member. Activates the membership only after Razorpay verification |
+| POST | `/api/auth/invitations` | ADMIN. Creates a 24-hour member invitation |
+| POST | `/api/auth/invitations/{id}/resend` | ADMIN |
+| POST | `/api/auth/invitations/accept` | Public. Sets the invited member's password |
+| POST | `/api/auth/password/forgot` | Public. Always returns a generic message |
+| POST | `/api/auth/password/reset` | Public. Consumes a 30-minute reset link |
+| POST | `/api/payments/checkout` | Signed-in member. Opens a pending demo checkout |
+| POST | `/api/payments/checkout/demo` | Same member. Records the simulated card payment and activates the membership |
 | POST | `/api/payments/checkout/cancel` | Same member. Leaves the membership inactive |
 | POST | `/api/payments` | STAFF or ADMIN simulated ledger only |
 | GET | `/api/payments/member/{memberId}` | Owner, STAFF, or ADMIN |
@@ -120,16 +125,20 @@ CREATE DATABASE pulsefit_trainers;
 
 ## Known limits
 
-Member purchases no longer become active from the Add Subscription form. A member chooses a plan, and Payment Service opens a Razorpay **test** order. The subscription stays `PENDING` until `POST /api/payments/verify` checks the Razorpay signature and the captured amount. Failed or closed checkouts stay inactive and do not block a later purchase. An unexpired `ACTIVE` membership blocks another plan until the expiry date.
+Public registration is closed. An administrator opens **Invitations**, enters a name and email, and Auth Service stores only a hash of a 24-hour single-use token. The member opens `/invite/{token}`, chooses a password, and then signs in. Forgot password is `/forgot`; the reset link is `/reset/{token}` and expires after 30 minutes. Resetting a password increments the token version so older JWTs stop working.
 
-Set these environment variables before checkout. Do not commit them.
+Email uses the same SMTP settings as notifications. If `SMTP_HOST` is empty, the invitation is saved and the admin response says the email was not sent. In that development case the response also includes the invite link so the flow can be demonstrated. Do not treat that link as a sent email.
 
 ```text
-RAZORPAY_KEY_ID=rzp_test_...
-RAZORPAY_KEY_SECRET=...
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM=noreply@pulsefit.local
+PUBLIC_APP_URL=http://localhost:5173
 ```
 
-The catalog amount is charged in INR paise. Razorpay Checkout shows UPI first. In test mode use UPI id `success@razorpay` for a captured payment and `failure@razorpay` for a failure. Neither moves real money. Checkout returns HTTP 503 until the two environment variables are set, and it does not create an active membership. The old simulated ledger at `POST /api/payments` is staff-only and stays labeled simulated.
+Member checkout is a **demo card payment**. The card number, expiry, and CVV on the page are fixed sample values and are not submitted. `POST /api/payments/checkout/demo` sends only the payment id. The server prices the plan, marks the payment simulated, and activates the pending membership. Cancelling checkout does not activate it. An unexpired `ACTIVE` membership blocks another plan. No Razorpay, UPI, or real card charge is used. The staff ledger at `POST /api/payments` remains labeled simulated.
 
 On startup, Subscription Service widens the PostgreSQL `subscriptions_status_check` constraint so `PENDING` can be stored. Hibernate does not update that check when the status enum grows.
 
@@ -155,17 +164,21 @@ cd api-gateway && mvn spring-boot:run
 
 Use `http://localhost:8761` to inspect registered clients.
 
-For a standard workflow:
-1. Register or login via `POST http://localhost:8080/api/auth/login` or `POST http://localhost:8080/api/auth/register`.
-2. Create a member at `POST http://localhost:8080/api/members`.
-3. Create a plan at `POST http://localhost:8080/api/plans`.
-4. Create a subscription at `POST http://localhost:8080/api/subscriptions`.
-5. Check in at `POST http://localhost:8080/api/attendance/check-in`.
+Frontend routes: `/login`, `/forgot`, `/reset/:token`, `/invite/:token`, `/invitations` (admin), `/plans`, `/checkout/:planId`, and `/checkout/result`. `/register` redirects to login. Public `POST /api/auth/register` returns 403.
+
+To try the flows locally:
+
+1. Sign in as `admin@pulsefit.com`. Open **Invitations**, enter a name and email, and submit.
+2. If SMTP is not configured, copy the invite link from the success message. Open it, set a password of at least 8 characters, then sign in on `/login`.
+3. On the login page choose **Forgot password?**, enter the member email, and confirm the generic response. With SMTP configured, open the emailed `/reset/{token}` link and set a new password. Without SMTP the reset link is not returned, so the service tests cover token acceptance.
+4. As that member, open **Plans**, continue to checkout, and choose **Pay Now (Demo)**. The confirmation shows a `demo-` transaction reference and states that no money moved. Cancel instead, and the membership stays inactive. An unexpired active membership blocks another purchase.
+
+Desk staff can still create a member profile and issue a claim link. Members do not create their own accounts.
 
 Example payloads:
 
 ```json
-{"email":"user@example.com","password":"Password123!","firstName":"Jane","lastName":"Doe","contact":"555-0100"}
+{"fullName":"Jane Doe","email":"jane@example.com"}
 ```
 
 ```json

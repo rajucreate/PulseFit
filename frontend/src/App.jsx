@@ -3,12 +3,15 @@ import { useAuth } from './auth';
 import Layout from './components/Layout';
 import Attendance from './pages/Attendance';
 import Audit from './pages/Audit';
+import AcceptInvite from './pages/AcceptInvite';
 import Claim from './pages/Claim';
 import Dashboard from './pages/Dashboard';
+import ForgotPassword from './pages/ForgotPassword';
+import Invitations from './pages/Invitations';
 import Login from './pages/Login';
 import Members from './pages/Members';
 import Plans from './pages/Plans';
-import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 import Reports from './pages/Reports';
 import Subscriptions from './pages/Subscriptions';
 import Team from './pages/Team';
@@ -42,7 +45,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
-      <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route path="/forgot" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+      <Route path="/reset/:token" element={<ResetPassword />} />
+      <Route path="/invite/:token" element={<AcceptInvite />} />
       <Route path="/claim" element={<GuestOnly><Claim /></GuestOnly>} />
       <Route
         element={
@@ -63,6 +69,7 @@ export default function App() {
         <Route path="notifications" element={<Notifications />} />
         <Route path="trainers" element={<Trainers />} />
         <Route path="reports" element={<RequireRole roles={['STAFF', 'ADMIN']}><Reports /></RequireRole>} />
+        <Route path="invitations" element={<RequireRole roles={['ADMIN']}><Invitations /></RequireRole>} />
         <Route path="team" element={<RequireRole roles={['ADMIN']}><Team /></RequireRole>} />
         <Route path="audit" element={<RequireRole roles={['ADMIN']}><Audit /></RequireRole>} />
       </Route>

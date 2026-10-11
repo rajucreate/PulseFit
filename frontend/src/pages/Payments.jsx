@@ -105,7 +105,7 @@ export default function Payments() {
         eyebrow="Ledger"
         title="Payments"
         text={desk
-          ? 'Staff can record a simulated ledger entry. Member plans are purchased on the checkout page and stay inactive until Razorpay verification.'
+          ? 'Staff can record a simulated ledger entry. Member plans use the demo card checkout and stay inactive until Pay Now is confirmed.'
           : 'Membership purchases are completed on the checkout page. This list shows your payment records.'}
       />
       {desk ? <Alert tone="info">Simulated payments only. Choose SIMULATED_FAIL to record a failure without moving money.</Alert> : null}

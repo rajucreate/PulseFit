@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, errorText } from '../api';
 import { useAuth } from '../auth';
-import { Alert, Button, PageHeader, Spinner } from '../components/ui';
+import { Alert, Button, Field, PageHeader, Spinner } from '../components/ui';
 import { formatDate, todayISO } from '../format';
 
 function inr(value) {
@@ -16,22 +16,12 @@ function blockingSubscription(rows) {
   return (rows || []).find((row) => row.status === 'ACTIVE' && String(row.expiryDate) >= today) || null;
 }
 
-function loadRazorpay() {
-  if (window.Razorpay) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export default function Checkout() {
   const { planId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
+  const [checkout, setCheckout] = useState(null);
   const [current, setCurrent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -46,9 +36,16 @@ export default function Checkout() {
         const nextPlan = await api(`/api/plans/${planId}`);
         let rows = [];
         if (user?.memberId) rows = await api(`/api/subscriptions/member/${user.memberId}`);
-        if (!ignore) {
-          setPlan(nextPlan);
-          setCurrent(blockingSubscription(rows));
+        const blocked = blockingSubscription(rows);
+        if (ignore) return;
+        setPlan(nextPlan);
+        setCurrent(blocked);
+        if (!blocked && user?.memberId && nextPlan?.active) {
+          const started = await api('/api/payments/checkout', {
+            method: 'POST',
+            body: { planId: Number(planId) },
+          });
+          if (!ignore) setCheckout(started);
         }
       } catch (err) {
         if (!ignore) setError(errorText(err));
@@ -62,83 +59,32 @@ export default function Checkout() {
     };
   }, [planId, user]);
 
-  async function pay() {
+  async function pay(event) {
+    event.preventDefault();
+    if (!checkout?.paymentId || pending) return;
     setPending(true);
     setError('');
     try {
-      const checkout = await api('/api/payments/checkout', {
+      const payment = await api('/api/payments/checkout/demo', {
         method: 'POST',
-        body: { planId: Number(planId) },
+        body: { paymentId: checkout.paymentId },
       });
-      const ready = await loadRazorpay();
-      if (!ready || !window.Razorpay) {
-        setError('Razorpay Checkout could not be loaded. Check the network and try again.');
-        setPending(false);
-        return;
-      }
-      const razorpay = new window.Razorpay({
-        key: checkout.keyId,
-        amount: checkout.amountPaise,
-        currency: 'INR',
-        name: 'PulseFit',
-        description: `${checkout.planName}. Test-mode UPI. No live transfer.`,
-        order_id: checkout.orderId,
-        prefill: { email: user?.email || '' },
-        theme: { color: '#e85d04' },
-        config: {
-          display: {
-            blocks: {
-              upi: { name: 'Pay with UPI', instruments: [{ method: 'upi' }] },
-            },
-            sequence: ['block.upi'],
-            preferences: { show_default_blocks: true },
-          },
-        },
-        handler: async (response) => {
-          try {
-            const verified = await api('/api/payments/verify', {
-              method: 'POST',
-              body: {
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-              },
-            });
-            navigate('/checkout/result', { state: { payment: verified, checkout } });
-          } catch (err) {
-            setError(errorText(err));
-            setPending(false);
-          }
-        },
-        modal: {
-          ondismiss: async () => {
-            try {
-              await api('/api/payments/checkout/cancel', {
-                method: 'POST',
-                body: { orderId: checkout.orderId },
-              });
-            } catch {
-              // A pending order does not activate a membership.
-            }
-            setPending(false);
-            setError('Checkout was closed. The membership stays inactive until payment is verified.');
-          },
-        },
-      });
-      razorpay.on('payment.failed', async (response) => {
-        const orderId = response?.error?.metadata?.order_id || checkout.orderId;
-        try {
-          await api('/api/payments/checkout/cancel', { method: 'POST', body: { orderId } });
-        } catch {
-          // Failure still leaves the membership inactive.
-        }
-        navigate('/checkout/result', { state: { failed: true, orderId, checkout } });
-      });
-      razorpay.open();
+      navigate('/checkout/result', { state: { payment, checkout } });
     } catch (err) {
       setError(errorText(err));
       setPending(false);
     }
+  }
+
+  async function cancel() {
+    if (checkout?.orderId) {
+      try {
+        await api('/api/payments/checkout/cancel', { method: 'POST', body: { orderId: checkout.orderId } });
+      } catch {
+        // Leaving checkout does not activate a membership.
+      }
+    }
+    navigate('/plans');
   }
 
   return (
@@ -146,7 +92,7 @@ export default function Checkout() {
       <PageHeader
         eyebrow="Checkout"
         title={plan ? plan.planName : 'Checkout'}
-        text="Razorpay test mode. UPI is offered in Checkout. A membership starts only after the server verifies the signature and amount."
+        text="Demo card checkout only. No card details are sent to the server, and no money is transferred."
       />
       <Alert>{error}</Alert>
       {loading ? <Spinner label="Loading checkout" /> : null}
@@ -159,20 +105,32 @@ export default function Checkout() {
           <Link to="/subscriptions">View membership</Link>
         </section>
       ) : null}
-      {!loading && plan && !current ? (
+      {!loading && checkout && !current ? (
         <section className="panel checkout-card">
-          <p className="eyebrow">Amount from the plan</p>
-          <p className="price">{inr(plan.price)}</p>
-          <p>{plan.durationInDays} days · {plan.description || 'Standard club access.'}</p>
-          <p className="muted">Payable by Razorpay test UPI. The browser cannot change this amount.</p>
-          <div className="row">
-            <Link className="btn btn-secondary" to="/plans">Back to plans</Link>
-            <Button onClick={pay} disabled={pending || !user?.memberId || !plan.active}>
-              {pending ? 'Waiting for Razorpay…' : 'Pay with UPI (test)'}
-            </Button>
-          </div>
-          {!user?.memberId ? <p className="muted">This account has no member profile, so checkout is unavailable.</p> : null}
-          {!plan.active ? <p className="muted">This plan is not open for new memberships.</p> : null}
+          <p className="eyebrow">Demo payment</p>
+          <p className="price">{inr(checkout.amount)}</p>
+          <p>{checkout.durationInDays} days · {checkout.description || plan?.description || 'Standard club access.'}</p>
+          <p className="muted">Amount comes from the plan. This browser cannot change it. Status: {checkout.paymentStatus}.</p>
+          <form className="stack" onSubmit={pay}>
+            <Field label="Cardholder name" hint="Shown for the demo only. It is not submitted.">
+              <input value="Demo Member" readOnly />
+            </Field>
+            <Field label="Card number" hint="Sample value. It is not sent to PulseFit.">
+              <input value="4242 4242 4242 4242" readOnly />
+            </Field>
+            <div className="split">
+              <Field label="Expiry" hint="Demo display only.">
+                <input value="12 / 28" readOnly />
+              </Field>
+              <Field label="CVV" hint="Demo display only. Not submitted.">
+                <input value="•••" readOnly />
+              </Field>
+            </div>
+            <div className="row">
+              <Button type="button" variant="secondary" onClick={cancel}>Cancel</Button>
+              <Button type="submit" disabled={pending}>{pending ? 'Recording demo payment…' : 'Pay Now (Demo)'}</Button>
+            </div>
+          </form>
         </section>
       ) : null}
     </div>

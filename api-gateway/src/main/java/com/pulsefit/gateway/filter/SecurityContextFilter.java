@@ -126,7 +126,10 @@ public class SecurityContextFilter implements WebFilter, Ordered {
   private boolean isPublicRoute(String path, HttpMethod method) {
     if (path.startsWith("/api/auth/register")
         || path.startsWith("/api/auth/login")
-        || path.startsWith("/api/auth/claim/")) {
+        || path.startsWith("/api/auth/claim/")
+        || path.startsWith("/api/auth/password/")
+        || path.startsWith("/api/auth/invitations/preview")
+        || path.startsWith("/api/auth/invitations/accept")) {
       return true;
     }
     if (HttpMethod.GET.equals(method) && (path.equals("/api/plans") || path.startsWith("/api/plans/"))) {
@@ -143,6 +146,7 @@ public class SecurityContextFilter implements WebFilter, Ordered {
 
     // Admin only routes
     if (path.startsWith("/api/auth/users")
+        || path.startsWith("/api/auth/invitations")
         || path.startsWith("/api/auth/audit-logs")
         || (path.startsWith("/api/plans") && !HttpMethod.GET.equals(method))
         || (HttpMethod.DELETE.equals(method) && (path.startsWith("/api/members/") || path.startsWith("/api/subscriptions/")))) {

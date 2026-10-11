@@ -62,6 +62,7 @@ export default function Layout() {
     links.push({ to: '/reports', label: 'Reports', icon: 'chart' });
   }
   if (user?.role === 'ADMIN') {
+    links.push({ to: '/invitations', label: 'Invitations', icon: 'members' });
     links.push({ to: '/team', label: 'Team', icon: 'team' });
     links.push({ to: '/audit', label: 'Audit log', icon: 'audit' });
   }
