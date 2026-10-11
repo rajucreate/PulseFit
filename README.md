@@ -127,7 +127,9 @@ CREATE DATABASE pulsefit_trainers;
 
 Public registration is closed. An administrator opens **Invitations**, enters a name and email, and Auth Service stores only a hash of a 24-hour single-use token. The member opens `/invite/{token}`, chooses a password, and then signs in. Forgot password is `/forgot`; the reset link is `/reset/{token}` and expires after 30 minutes. Resetting a password increments the token version so older JWTs stop working.
 
-Email uses the same SMTP settings as notifications. If `SMTP_HOST` is empty, the invitation is saved and the admin response says the email was not sent. In that development case the response also includes the invite link so the flow can be demonstrated. Do not treat that link as a sent email.
+Invitation and password-reset mail is sent by the Node mailer on port 8090 (`mailer-service`, Nodemailer). Put the SMTP values in `mailer-service/.env` (copy `.env.example`). That file is not committed. Start the mailer with `npm start` in `mailer-service`, then restart it after changing `.env`. Auth Service calls `http://127.0.0.1:8090` and does not send mail itself. When an administrator uses **Add member**, the profile is saved and the same invitation email goes to that address. If `SMTP_HOST` is empty, the invitation is saved and the screen says the email was not sent. In that development case the response also includes the invite link. Do not treat that link as a sent email.
+
+The login page shows two local accounts: admin `admin@pulsefit.com` / `Admin@PulseFit2026`, and trainee `trainee@pulsefit.com` / `Trainee@PulseFit2026`. The catalog seeds Weekly, Quarterly, Half Year, and Annual plans alongside any plan already stored, including Monthly.
 
 ```text
 SMTP_HOST=

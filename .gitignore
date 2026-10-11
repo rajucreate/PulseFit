@@ -25,5 +25,7 @@ Thumbs.db
 # Frontend
 frontend/node_modules/
 frontend/dist/
+mailer-service/node_modules/
+mailer-service/.env
 
 .metadata/

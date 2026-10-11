@@ -59,6 +59,11 @@ export default function Login() {
         <code>admin@pulsefit.com</code>
         <code>Admin@PulseFit2026</code>
       </aside>
+      <aside className="demo-card">
+        <p>Trainee</p>
+        <code>trainee@pulsefit.com</code>
+        <code>Trainee@PulseFit2026</code>
+      </aside>
     </AuthFrame>
   );
 }

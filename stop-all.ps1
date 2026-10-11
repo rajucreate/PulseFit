@@ -11,7 +11,7 @@ Write-Host "============================================"
 Write-Host " PulseFit - Stopping microservices"
 Write-Host "============================================"
 
-$ports = @(8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8761)
+$ports = @(8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 8761)
 $stopped = @()
 
 # Prefer PID file
@@ -47,13 +47,23 @@ Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" | ForEach-Object {
   }
 }
 
-# Fallback: free known ports if still occupied by java
+Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | ForEach-Object {
+  $cmd = $_.CommandLine
+  if ($cmd -and $cmd -match 'mailer-service') {
+    try {
+      Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop
+      Write-Host "Stopped mailer-service PID $($_.ProcessId)"
+    } catch {}
+  }
+}
+
+# Fallback: free known ports if still occupied by java or the mailer
 foreach ($port in $ports) {
   try {
     $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($c in $conns) {
       $proc = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
-      if ($proc -and $proc.ProcessName -eq 'java') {
+      if ($proc -and ($proc.ProcessName -eq 'java' -or ($port -eq 8090 -and $proc.ProcessName -eq 'node'))) {
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
         Write-Host "Freed port $port (java PID $($proc.Id))"
       }
