@@ -17,6 +17,8 @@ export default function Members() {
   const [form, setForm] = useState(null);
   const [pending, setPending] = useState(false);
   const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState('');
+  const [devLink, setDevLink] = useState('');
 
   async function load() {
     setLoading(true);
@@ -62,16 +64,33 @@ export default function Members() {
     event.preventDefault();
     setPending(true);
     setError('');
+    setNotice('');
+    setDevLink('');
     const body = {
       name: form.name.trim(),
-      email: form.email.trim(),
+      email: form.email.trim().toLowerCase(),
       contact: form.contact.trim(),
       dateOfBirth: form.dateOfBirth || null,
       status: form.status,
     };
     try {
-      if (form.mode === 'create') await api('/api/members', { method: 'POST', body });
-      else await api(`/api/members/${form.id}`, { method: 'PUT', body });
+      if (form.mode === 'create') {
+        await api('/api/members', { method: 'POST', body });
+        if (isAdmin) {
+          try {
+            const invite = await api('/api/auth/invitations', {
+              method: 'POST',
+              body: { fullName: body.name, email: body.email },
+            });
+            setNotice(invite.message);
+            setDevLink(invite.inviteUrl || '');
+          } catch (err) {
+            setError(`Member saved, but the email was not sent. ${errorText(err)}`);
+          }
+        }
+      } else {
+        await api(`/api/members/${form.id}`, { method: 'PUT', body });
+      }
       setForm(null);
       await load();
     } catch (err) {
@@ -101,10 +120,16 @@ export default function Members() {
       <PageHeader
         eyebrow="People"
         title={isMember ? 'My profile' : 'Members'}
-        text={isMember ? 'You can update only the profile linked to this account.' : 'Front desk can add members. Admins can remove them.'}
+        text={isMember ? 'You can update only the profile linked to this account.' : 'Adding a member saves the profile. An administrator also emails that person a link to choose a password.'}
         actions={canManage ? <Button onClick={openCreate}>Add member</Button> : null}
       />
       <Alert>{error}</Alert>
+      {notice ? <Alert tone="info">{notice}</Alert> : null}
+      {devLink ? (
+        <Alert tone="info">
+          SMTP is not configured, so the link was not emailed. Copy it for this demo: {devLink}
+        </Alert>
+      ) : null}
       {loading ? <Spinner label="Loading members" /> : null}
       {!loading && isMember && !user.memberId ? (
         <Empty title="No profile linked" text="Registering creates a profile automatically. A staff-created record can be claimed from the sign-in page." />
@@ -154,6 +179,9 @@ export default function Members() {
       {form ? (
         <Modal title={form.mode === 'create' ? 'Add member' : 'Edit member'} onClose={() => setForm(null)}>
           <form onSubmit={save} className="stack">
+            {form.mode === 'create' && isAdmin ? (
+              <p className="muted">Saving sends this person an email with a single-use link to set their password.</p>
+            ) : null}
             <Field label="Full name">
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             </Field>

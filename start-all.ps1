@@ -95,6 +95,34 @@ Write-Host "============================================"
 
 $records = @()
 
+function Start-Mailer {
+  if (Test-Port 8090) {
+    Write-Host "  mailer-service already running on 8090 - skipping"
+    return $null
+  }
+  $dir = Join-Path $Root 'mailer-service'
+  $node = (Get-Command node -ErrorAction SilentlyContinue).Source
+  if (-not $node) { Write-Warning "Node.js was not found, so invitation email cannot be sent."; return $null }
+  if (-not (Test-Path (Join-Path $dir 'node_modules\nodemailer'))) {
+    Write-Host "Installing mailer-service dependencies ..."
+    Push-Location $dir
+    & npm install
+    Pop-Location
+  }
+  Write-Host "Starting mailer-service (port 8090) ..."
+  $p = Start-Process -FilePath $node `
+    -ArgumentList @('server.js') `
+    -WorkingDirectory $dir `
+    -RedirectStandardOutput (Join-Path $LogDir 'mailer-service.log') `
+    -RedirectStandardError (Join-Path $LogDir 'mailer-service.err.log') `
+    -PassThru -WindowStyle Hidden
+  return @{ name = 'mailer-service'; port = 8090; pid = $p.Id; jar = 'server.js' }
+}
+
+$mailer = Start-Mailer
+if ($mailer) { $records += $mailer }
+Wait-Port 8090 'Mailer'
+
 $r = Start-PulseService 'eureka-server' 8761
 if ($r) { $records += $r }
 Wait-Port 8761 'Eureka'
@@ -140,6 +168,7 @@ foreach ($rec in $records) {
 }
 # Also record already-running services by scanning ports
 $known = @(
+  @{ n = 'mailer-service'; p = 8090 },
   @{ n = 'eureka-server'; p = 8761 },
   @{ n = 'api-gateway'; p = 8080 },
   @{ n = 'member-service'; p = 8081 },
