@@ -136,6 +136,11 @@ public class SecurityContextFilter implements WebFilter, Ordered {
   }
 
   private boolean isAuthorized(String path, HttpMethod method, String role) {
+    // Service-to-service routes are called directly, not through the public gateway.
+    if (path.contains("/internal")) {
+      return false;
+    }
+
     // Admin only routes
     if (path.startsWith("/api/auth/users")
         || path.startsWith("/api/auth/audit-logs")
@@ -144,10 +149,51 @@ public class SecurityContextFilter implements WebFilter, Ordered {
       return "ADMIN".equalsIgnoreCase(role);
     }
 
+    boolean desk = "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role);
+    if (path.startsWith("/api/reports")) {
+      return desk;
+    }
+    if (path.startsWith("/api/facilities") && !HttpMethod.GET.equals(method)) {
+      return desk;
+    }
+    if (path.startsWith("/api/trainers")
+        && !HttpMethod.GET.equals(method)
+        && !path.matches("/api/trainers/\\d+/members/\\d+")) {
+      return desk;
+    }
+    if ((HttpMethod.POST.equals(method) || HttpMethod.DELETE.equals(method))
+        && path.matches("/api/trainers/\\d+/members/\\d+")) {
+      return desk;
+    }
+    if (HttpMethod.GET.equals(method) && path.matches("/api/trainers/\\d+/members")) {
+      return desk;
+    }
+    if (HttpMethod.POST.equals(method) && path.equals("/api/payments")) {
+      return desk;
+    }
+    if (HttpMethod.POST.equals(method) && path.matches("/api/payments/\\d+/retry")) {
+      return desk;
+    }
+    if (HttpMethod.POST.equals(method) && path.matches("/api/payments/\\d+/refund")) {
+      return desk;
+    }
+    if (HttpMethod.POST.equals(method)
+        && path.equals("/api/notifications")
+        && !path.startsWith("/api/notifications/internal")) {
+      return desk;
+    }
+    if (HttpMethod.POST.equals(method) && path.matches("/api/notifications/\\d+/retry")) {
+      return desk;
+    }
+
     // Staff or Admin routes (bulk listings)
     if (HttpMethod.GET.equals(method)) {
-      if (path.equals("/api/members") || path.equals("/api/subscriptions") || path.equals("/api/attendance")) {
-        return "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role);
+      if (path.equals("/api/members")
+          || path.equals("/api/subscriptions")
+          || path.equals("/api/attendance")
+          || path.equals("/api/payments")
+          || path.equals("/api/notifications")) {
+        return desk;
       }
     }
 

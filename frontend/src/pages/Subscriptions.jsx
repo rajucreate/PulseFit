@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, errorText } from '../api';
 import { useAuth } from '../auth';
 import { Alert, Badge, Button, Empty, Field, Modal, PageHeader, Spinner, statusTone } from '../components/ui';
-import { addDays, formatDate, todayISO } from '../format';
+import { addDays, formatDate } from '../format';
 
 export default function Subscriptions() {
   const { user } = useAuth();
@@ -52,19 +53,6 @@ export default function Subscriptions() {
     return members.find((member) => member.id === id)?.name || `Member ${id}`;
   }
 
-  function openCreate() {
-    const start = todayISO();
-    const firstPlan = plans.find((plan) => plan.active) || plans[0];
-    setForm({
-      mode: 'create',
-      memberId: user.role === 'MEMBER' ? user.memberId : members[0]?.id || '',
-      planId: firstPlan?.id || '',
-      startDate: start,
-      expiryDate: firstPlan ? addDays(start, firstPlan.durationInDays) : start,
-      status: 'ACTIVE',
-    });
-  }
-
   function openEdit(row) {
     setForm({ mode: 'edit', ...row });
   }
@@ -111,15 +99,13 @@ export default function Subscriptions() {
     }
   }
 
-  const canCreate = user.role === 'MEMBER' ? Boolean(user.memberId) : desk;
-
   return (
     <div>
       <PageHeader
         eyebrow="Billing"
         title="Subscriptions"
         text="A subscription is valid when it is active and today falls inside the start and expiry dates."
-        actions={canCreate ? <Button onClick={openCreate} disabled={plans.length === 0 || (desk && members.length === 0)}>New subscription</Button> : null}
+        actions={<Link className="btn btn-primary" to="/plans">Choose a plan</Link>}
       />
       <Alert>{error}</Alert>
       {loading ? <Spinner label="Loading subscriptions" /> : null}
@@ -146,7 +132,7 @@ export default function Subscriptions() {
                   <td>{formatDate(row.startDate)} – {formatDate(row.expiryDate)}</td>
                   <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
                   <td className="actions">
-                    {desk || user.role === 'MEMBER' ? <Button variant="secondary" onClick={() => openEdit(row)}>Edit</Button> : null}
+                    {desk ? <Button variant="secondary" onClick={() => openEdit(row)}>Edit</Button> : null}
                     {isAdmin ? <Button variant="danger" onClick={() => remove(row)}>Delete</Button> : null}
                   </td>
                 </tr>
@@ -186,9 +172,10 @@ export default function Subscriptions() {
                 <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} required />
               </Field>
             </div>
-            <Field label="Status">
+            <Field label="Status" hint="Active is set only after a verified payment.">
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                <option value="ACTIVE">ACTIVE</option>
+                {form.status === 'ACTIVE' ? <option value="ACTIVE">ACTIVE</option> : null}
+                <option value="PENDING">PENDING</option>
                 <option value="EXPIRED">EXPIRED</option>
                 <option value="CANCELLED">CANCELLED</option>
               </select>

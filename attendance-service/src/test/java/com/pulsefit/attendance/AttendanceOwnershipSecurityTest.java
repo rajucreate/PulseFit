@@ -36,7 +36,7 @@ class AttendanceOwnershipSecurityTest {
 
   @BeforeEach
   void setUp() {
-    attendanceService = new AttendanceService(repository, subscriptions);
+    attendanceService = new AttendanceService(repository, subscriptions, null, null, null);
     controller = new AttendanceController(attendanceService);
   }
 

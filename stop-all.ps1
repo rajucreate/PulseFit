@@ -11,7 +11,7 @@ Write-Host "============================================"
 Write-Host " PulseFit - Stopping microservices"
 Write-Host "============================================"
 
-$ports = @(8080, 8081, 8082, 8083, 8084, 8761)
+$ports = @(8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8761)
 $stopped = @()
 
 # Prefer PID file
@@ -38,7 +38,7 @@ if (Test-Path $PidFile) {
 Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" | ForEach-Object {
   $cmd = $_.CommandLine
   if (-not $cmd) { return }
-  if ($cmd -match 'PulseFit\\(eureka-server|api-gateway|auth-service|member-service|subscription-service|attendance-service)\\target\\') {
+  if ($cmd -match 'PulseFit\\(eureka-server|api-gateway|auth-service|member-service|subscription-service|attendance-service|facility-service|payment-service|notification-service|trainer-service|reporting-service)\\target\\') {
     try {
       Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop
       Write-Host "Stopped java PID $($_.ProcessId) ($($Matches[1]))"

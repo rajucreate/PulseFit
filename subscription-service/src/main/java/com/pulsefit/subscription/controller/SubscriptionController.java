@@ -24,6 +24,11 @@ public class SubscriptionController {
   @ResponseStatus(HttpStatus.CREATED)
   public SubscriptionResponse create(
       @Valid @RequestBody SubscriptionRequest r, Authentication authentication) {
+    if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user
+        && "MEMBER".equalsIgnoreCase(user.role())) {
+      throw new AccessDeniedException(
+          "Choose a plan and complete checkout. A membership is activated only after payment is verified.");
+    }
     enforceMemberIdOwnership(r.memberId(), authentication, "create subscription for");
     return service.create(r);
   }

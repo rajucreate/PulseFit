@@ -12,6 +12,11 @@ const ICONS = {
   check: 'M5 12l4 4L19 7',
   team: 'M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM5 19a7 7 0 0 1 14 0',
   audit: 'M6 4h9l3 3v13H6V4zm8 0v4h4M8 12h8M8 16h6',
+  facility: 'M4 20V8l8-4 8 4v12H4zm6 0v-6h4v6',
+  pay: 'M3 7h18v10H3V7zm0 3h18M7 14h4',
+  bell: 'M6 16V10a6 6 0 1 1 12 0v6l2 2H4l2-2zm4 3a2 2 0 0 0 4 0',
+  trainer: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 12a2 2 0 1 0 0-4M4 19a5 5 0 0 1 8-2',
+  chart: 'M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-6',
 };
 
 function Icon({ name }) {
@@ -48,7 +53,14 @@ export default function Layout() {
     { to: '/members', label: user?.role === 'MEMBER' ? 'My profile' : 'Members', icon: 'members' },
     { to: '/subscriptions', label: 'Subscriptions', icon: 'subs' },
     { to: '/attendance', label: 'Attendance', icon: 'check' },
+    { to: '/facilities', label: 'Facilities', icon: 'facility' },
+    { to: '/payments', label: 'Payments', icon: 'pay' },
+    { to: '/notifications', label: 'Notifications', icon: 'bell' },
+    { to: '/trainers', label: 'Trainers', icon: 'trainer' },
   ];
+  if (user?.role === 'STAFF' || user?.role === 'ADMIN') {
+    links.push({ to: '/reports', label: 'Reports', icon: 'chart' });
+  }
   if (user?.role === 'ADMIN') {
     links.push({ to: '/team', label: 'Team', icon: 'team' });
     links.push({ to: '/audit', label: 'Audit log', icon: 'audit' });
