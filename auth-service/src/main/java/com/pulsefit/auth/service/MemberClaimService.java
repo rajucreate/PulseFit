@@ -26,6 +26,7 @@ public class MemberClaimService {
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final AuditLogService auditLogService;
+  private final ClubMailer mailer;
   private final SecureRandom secureRandom = new SecureRandom();
 
   public MemberClaimService(
@@ -34,13 +35,15 @@ public class MemberClaimService {
       MemberServiceClient memberServiceClient,
       PasswordEncoder passwordEncoder,
       JwtTokenProvider jwtTokenProvider,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      ClubMailer mailer) {
     this.claimTokenRepository = claimTokenRepository;
     this.userRepository = userRepository;
     this.memberServiceClient = memberServiceClient;
     this.passwordEncoder = passwordEncoder;
     this.jwtTokenProvider = jwtTokenProvider;
     this.auditLogService = auditLogService;
+    this.mailer = mailer;
   }
 
   @Transactional
@@ -83,11 +86,24 @@ public class MemberClaimService {
         null, request.email(), ipAddress, "CLAIM_INITIATE", null, request.email(),
         "Verification code generated for member ID: " + member.id(), "SUCCESS", null);
 
-    // In non-production/dev environments, return devOtp for seamless testing without SMTP
+    if (!mailer.configured()) {
+      return new ClaimInitiateResponse(
+          "Verification code saved. Email was not sent because SMTP is not configured.",
+          expiresAt,
+          rawOtp);
+    }
+    try {
+      mailer.send(
+          request.email(),
+          "Your PulseFit verification code",
+          "Your PulseFit verification code is "
+              + rawOtp
+              + ". It expires in 15 minutes.\n\nIf you did not request this code, ignore this email.");
+    } catch (RuntimeException ex) {
+      throw new BadRequestException("The verification code could not be emailed. Try again shortly.");
+    }
     return new ClaimInitiateResponse(
-        "Verification code sent to registered member email. Code expires in 15 minutes.",
-        expiresAt,
-        rawOtp);
+        "Verification code sent to your email. It expires in 15 minutes.", expiresAt, null);
   }
 
   @Transactional
