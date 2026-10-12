@@ -75,7 +75,7 @@ export default function Claim() {
             <Alert tone="info">
               {notice.message || 'Code sent.'}
               {notice.expiresAt ? ` Expires ${formatDateTime(notice.expiresAt)}.` : ''}
-              {notice.devOtp ? ` Development code: ${notice.devOtp}` : ''}
+              {notice.devOtp ? ` SMTP is not configured, so the code was not emailed. Use this code: ${notice.devOtp}` : ''}
             </Alert>
           ) : null}
           <Field label="Email">

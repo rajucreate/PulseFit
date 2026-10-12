@@ -15,6 +15,7 @@ import com.pulsefit.auth.repository.ClaimTokenRepository;
 import com.pulsefit.auth.repository.UserRepository;
 import com.pulsefit.auth.security.JwtTokenProvider;
 import com.pulsefit.auth.service.AuditLogService;
+import com.pulsefit.auth.service.ClubMailer;
 import com.pulsefit.auth.service.MemberClaimService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,6 +37,7 @@ class MemberClaimServiceTest {
   @Mock private MemberServiceClient memberServiceClient;
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private com.pulsefit.auth.repository.AuditLogRepository auditLogRepository;
+  @Mock private ClubMailer mailer;
 
   private JwtTokenProvider jwtTokenProvider;
   private AuditLogService auditLogService;
@@ -59,7 +61,8 @@ class MemberClaimServiceTest {
             memberServiceClient,
             passwordEncoder,
             jwtTokenProvider,
-            auditLogService);
+            auditLogService,
+            mailer);
   }
 
   @Test
@@ -72,10 +75,12 @@ class MemberClaimServiceTest {
     when(memberServiceClient.findByEmail("member@pulsefit.com")).thenReturn(member);
     when(claimTokenRepository.findByEmailOrderByCreatedAtDesc("member@pulsefit.com")).thenReturn(Collections.emptyList());
     when(passwordEncoder.encode(anyString())).thenReturn("hashed_otp");
+    when(mailer.configured()).thenReturn(true);
 
     ClaimInitiateResponse resp = memberClaimService.initiateClaim(req, "127.0.0.1");
     assertNotNull(resp);
-    assertNotNull(resp.devOtp());
+    assertNull(resp.devOtp());
+    verify(mailer).send(eq("member@pulsefit.com"), eq("Your PulseFit verification code"), contains("expires in 15 minutes"));
     verify(claimTokenRepository, times(1)).save(any(ClaimToken.class));
   }
 
