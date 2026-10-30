@@ -117,6 +117,36 @@ class GatewaySecurityTest {
         ReflectionTestUtils.invokeMethod(filter, "isAuthorized", "/api/payments", HttpMethod.GET, "ADMIN"));
   }
 
+  @Test
+  void actuatorHealthIsPublic() {
+    when(filterChain.filter(any())).thenReturn(Mono.empty());
+    filter.filter(MockServerWebExchange.from(MockServerHttpRequest.get("/actuator/health").build()), filterChain).block();
+    verify(filterChain, times(1)).filter(any());
+  }
+
+  @Test
+  void servicesStatusRequiresToken() {
+    MockServerWebExchange exchange =
+        MockServerWebExchange.from(MockServerHttpRequest.get("/api/services/status").build());
+    filter.filter(exchange, filterChain).block();
+    assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+  }
+
+  @Test
+  void deskCanListMembersAndAssignThroughGatewayRules() {
+    assertEquals(
+        true,
+        ReflectionTestUtils.invokeMethod(filter, "isAuthorized", "/api/members", HttpMethod.GET, "STAFF"));
+    assertEquals(
+        true,
+        ReflectionTestUtils.invokeMethod(
+            filter, "isAuthorized", "/api/members/3/subscriptions", HttpMethod.POST, "ADMIN"));
+    assertEquals(
+        false,
+        ReflectionTestUtils.invokeMethod(
+            filter, "isAuthorized", "/api/members", HttpMethod.GET, "MEMBER"));
+  }
+
   private boolean authorized(String path, HttpMethod method) {
     return Boolean.TRUE.equals(
         ReflectionTestUtils.invokeMethod(filter, "isAuthorized", path, method, "TRAINEE"));

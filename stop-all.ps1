@@ -35,13 +35,15 @@ if (Test-Path $PidFile) {
 }
 
 # Also stop any java process whose command line contains PulseFit service jars
-Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" | ForEach-Object {
+Get-CimInstance Win32_Process | Where-Object {
+  $_.Name -in @('java.exe', 'javaw.exe') -and $_.CommandLine -and
+  $_.CommandLine -match 'PulseFit\\(eureka-server|api-gateway|auth-service|member-service|subscription-service|attendance-service|facility-service|payment-service|notification-service|trainer-service|reporting-service)\\target\\'
+} | ForEach-Object {
   $cmd = $_.CommandLine
-  if (-not $cmd) { return }
   if ($cmd -match 'PulseFit\\(eureka-server|api-gateway|auth-service|member-service|subscription-service|attendance-service|facility-service|payment-service|notification-service|trainer-service|reporting-service)\\target\\') {
     try {
       Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop
-      Write-Host "Stopped java PID $($_.ProcessId) ($($Matches[1]))"
+      Write-Host "Stopped $($_.Name) PID $($_.ProcessId) ($($Matches[1]))"
       $stopped += $Matches[1]
     } catch {}
   }
@@ -63,9 +65,9 @@ foreach ($port in $ports) {
     $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($c in $conns) {
       $proc = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
-      if ($proc -and ($proc.ProcessName -eq 'java' -or ($port -eq 8090 -and $proc.ProcessName -eq 'node'))) {
+      if ($proc -and ($proc.ProcessName -in @('java', 'javaw') -or ($port -eq 8090 -and $proc.ProcessName -eq 'node'))) {
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-        Write-Host "Freed port $port (java PID $($proc.Id))"
+        Write-Host "Freed port $port ($($proc.ProcessName) PID $($proc.Id))"
       }
     }
   } catch {}

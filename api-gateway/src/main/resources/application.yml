@@ -3,47 +3,60 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: false
       routes:
         - id: auth-service
           uri: lb://AUTH-SERVICE
           predicates:
-            - Path=/api/auth/**
+            - Path=/api/auth,/api/auth/**
+        - id: member-subscriptions
+          uri: lb://MEMBER-SERVICE
+          predicates:
+            - Path=/api/members/*/subscriptions,/api/members/*/subscriptions/**
+          order: 0
         - id: member-service
           uri: lb://MEMBER-SERVICE
           predicates:
-            - Path=/api/members/**
+            - Path=/api/members,/api/members/**
+          order: 1
         - id: subscription-plans
           uri: lb://SUBSCRIPTION-SERVICE
           predicates:
-            - Path=/api/plans/**
+            - Path=/api/plans,/api/plans/**
         - id: subscriptions
           uri: lb://SUBSCRIPTION-SERVICE
           predicates:
-            - Path=/api/subscriptions/**
+            - Path=/api/subscriptions,/api/subscriptions/**
         - id: attendance-service
           uri: lb://ATTENDANCE-SERVICE
           predicates:
-            - Path=/api/attendance/**
+            - Path=/api/attendance,/api/attendance/**
         - id: facility-service
           uri: lb://FACILITY-SERVICE
           predicates:
-            - Path=/api/facilities/**
+            - Path=/api/facilities,/api/facilities/**
         - id: payment-service
           uri: lb://PAYMENT-SERVICE
           predicates:
-            - Path=/api/payments/**
+            - Path=/api/payments,/api/payments/**
         - id: notification-service
           uri: lb://NOTIFICATION-SERVICE
           predicates:
-            - Path=/api/notifications/**
+            - Path=/api/notifications,/api/notifications/**
         - id: trainer-service
           uri: lb://TRAINER-SERVICE
           predicates:
-            - Path=/api/trainers/**
+            - Path=/api/trainers,/api/trainers/**
         - id: reporting-service
           uri: lb://REPORTING-SERVICE
           predicates:
-            - Path=/api/reports/**
+            - Path=/api/reports,/api/reports/**
+        - id: services-status
+          uri: forward:/api/services
+          predicates:
+            - Path=/api/services,/api/services/**
       globalcors:
         add-to-simple-url-handler-mapping: true
         cors-configurations:
@@ -67,6 +80,29 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    eureka:
+      enabled: false
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: PulseFit API Gateway
+    description: Routes authenticated requests to PulseFit microservices through Eureka
+    version: 0.0.1-SNAPSHOT
 
 pulsefit:
   jwt:

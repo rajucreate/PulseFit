@@ -50,6 +50,14 @@ public class AuthController {
     return authService.getCurrentUser(userId);
   }
 
+  @PostMapping("/refresh")
+  public AuthResponse refresh(Authentication authentication, HttpServletRequest httpRequest) {
+    if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)) {
+      throw new IllegalArgumentException("User not authenticated");
+    }
+    return authService.refresh(userId, authentication.getName(), getClientIp(httpRequest));
+  }
+
   @PostMapping("/claim/initiate")
   public ClaimInitiateResponse initiateClaim(
       @Valid @RequestBody ClaimInitiateRequest request, HttpServletRequest httpRequest) {

@@ -101,6 +101,18 @@ class AuthServiceTest {
   }
 
   @Test
+  void refresh_IssuesNewAccessToken() {
+    User user = new User("user@pulsefit.com", "hashed_pw", "John", "Doe", Role.MEMBER, 50L);
+    user.setId(10L);
+    when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+
+    AuthResponse resp = authService.refresh(10L, "user@pulsefit.com", "127.0.0.1");
+    assertNotNull(resp.accessToken());
+    assertEquals("Bearer", resp.tokenType());
+    assertEquals(50L, resp.user().memberId());
+  }
+
+  @Test
   void logout_IncrementsTokenVersion() {
     authService.logout(10L, "user@pulsefit.com", "127.0.0.1");
     verify(userRepository, times(1)).incrementTokenVersion(10L);

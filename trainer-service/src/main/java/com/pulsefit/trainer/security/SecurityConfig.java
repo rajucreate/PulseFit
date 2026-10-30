@@ -25,7 +25,11 @@ public class SecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/api/trainers/internal/**")
+                auth.requestMatchers(
+                        "/actuator/health",
+                        "/actuator/health/**",
+                        "/actuator/info",
+                        "/api/trainers/internal/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

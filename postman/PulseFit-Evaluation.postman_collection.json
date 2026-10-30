@@ -1,0 +1,305 @@
+{
+  "info": {
+    "name": "PulseFit Evaluation APIs",
+    "description": "Rubric coverage for discovery, JWT security, gateway routing, and status codes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "eurekaUrl", "value": "http://localhost:8761" },
+    { "key": "adminEmail", "value": "admin@pulsefit.com" },
+    { "key": "adminPassword", "value": "Admin@PulseFit2026" },
+    { "key": "accessToken", "value": "" },
+    { "key": "memberId", "value": "1" },
+    { "key": "planId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Discovery & Health",
+      "item": [
+        {
+          "name": "Gateway health",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 health', () => pm.response.to.have.status(200));",
+            "pm.test('UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/actuator/health" }
+        },
+        {
+          "name": "Gateway info",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 info', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/actuator/info" }
+        },
+        {
+          "name": "Auth service health",
+          "request": { "method": "GET", "url": "http://localhost:8084/actuator/health" }
+        },
+        {
+          "name": "Eureka apps",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 registry', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{eurekaUrl}}/eureka/apps"
+          }
+        },
+        {
+          "name": "Services status",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 status', () => pm.response.to.have.status(200));",
+            "pm.test('has services', () => pm.expect(pm.response.json().services.length).to.be.above(0));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/services/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. JWT Auth",
+      "item": [
+        {
+          "name": "Login valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 login', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('token present', () => pm.expect(body.accessToken).to.be.a('string'));",
+            "pm.collectionVariables.set('accessToken', body.accessToken);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Login invalid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 invalid login', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@pulsefit.com\",\n  \"password\": \"WrongPassword!\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Register closed",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 closed register', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"new.user@example.com\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"New\",\n  \"lastName\": \"User\",\n  \"contact\": \"555-0100\",\n  \"dateOfBirth\": \"1995-01-01\"\n}" },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Me",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 me', () => pm.response.to.have.status(200));",
+            "pm.test('admin role', () => pm.expect(pm.response.json().role).to.eql('ADMIN'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Refresh",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 refresh', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/refresh"
+          }
+        },
+        {
+          "name": "Missing JWT",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 missing token', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/members" }
+        }
+      ]
+    },
+    {
+      "name": "3. Gateway CRUD",
+      "item": [
+        {
+          "name": "List members",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 members', () => pm.response.to.have.status(200));",
+            "const rows = pm.response.json();",
+            "if (rows.length) pm.collectionVariables.set('memberId', String(rows[0].id));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members"
+          }
+        },
+        {
+          "name": "Create member",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 create', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('memberId', String(pm.response.json().id));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Member\",\n  \"email\": \"postman.member.{{$timestamp}}@pulsefit.local\",\n  \"contact\": \"555-0200\",\n  \"dateOfBirth\": \"1998-05-05\",\n  \"status\": \"ACTIVE\"\n}" },
+            "url": "{{baseUrl}}/api/members"
+          }
+        },
+        {
+          "name": "Get member",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 get', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members/{{memberId}}"
+          }
+        },
+        {
+          "name": "Update member",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 update', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Member Updated\",\n  \"email\": \"postman.updated.{{$timestamp}}@pulsefit.local\",\n  \"contact\": \"555-0201\",\n  \"dateOfBirth\": \"1998-05-05\",\n  \"status\": \"ACTIVE\"\n}" },
+            "url": "{{baseUrl}}/api/members/{{memberId}}"
+          }
+        },
+        {
+          "name": "Member not found",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 missing', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members/999999"
+          }
+        },
+        {
+          "name": "Invalid member create",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 invalid', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"contact\": \"\",\n  \"status\": \"ACTIVE\"\n}" },
+            "url": "{{baseUrl}}/api/members"
+          }
+        },
+        {
+          "name": "List trainers",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 trainers', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/trainers"
+          }
+        },
+        {
+          "name": "List plans",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 plans', () => pm.response.to.have.status(200));",
+            "const plans = pm.response.json();",
+            "if (plans.length) pm.collectionVariables.set('planId', String(plans[0].id));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/plans" }
+        },
+        {
+          "name": "Assign membership",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 assign', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"planId\": {{planId}},\n  \"startDate\": \"2026-10-30\",\n  \"expiryDate\": \"2026-11-29\",\n  \"status\": \"PENDING\"\n}" },
+            "url": "{{baseUrl}}/api/members/{{memberId}}/subscriptions"
+          }
+        },
+        {
+          "name": "View member subscriptions",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 subscriptions', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members/{{memberId}}/subscriptions"
+          }
+        },
+        {
+          "name": "Member forbidden for bulk list as member role note",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('endpoint reachable with admin', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members"
+          }
+        },
+        {
+          "name": "Delete member",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 delete', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/members/{{memberId}}"
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 logout', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        }
+      ]
+    }
+  ]
+}

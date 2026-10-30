@@ -124,6 +124,11 @@ public class SecurityContextFilter implements WebFilter, Ordered {
   }
 
   private boolean isPublicRoute(String path, HttpMethod method) {
+    if (path.equals("/actuator/health")
+        || path.startsWith("/actuator/health/")
+        || path.equals("/actuator/info")) {
+      return true;
+    }
     if (path.startsWith("/api/auth/register")
         || path.startsWith("/api/auth/login")
         || path.startsWith("/api/auth/claim/")
@@ -158,6 +163,9 @@ public class SecurityContextFilter implements WebFilter, Ordered {
     }
 
     boolean desk = "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role);
+    if (path.startsWith("/api/services")) {
+      return desk || "MEMBER".equalsIgnoreCase(role) || "TRAINEE".equalsIgnoreCase(role);
+    }
     if (path.startsWith("/api/reports")) {
       return desk;
     }
@@ -225,6 +233,12 @@ public class SecurityContextFilter implements WebFilter, Ordered {
       return true;
     }
     if (path.equals("/api/trainers/me/roster")) {
+      return true;
+    }
+    if (path.equals("/api/services/status") || path.equals("/api/services/registry")) {
+      return true;
+    }
+    if (path.matches("/api/members/\\d+/subscriptions")) {
       return true;
     }
     if (path.matches("/api/subscriptions/member/\\d+")

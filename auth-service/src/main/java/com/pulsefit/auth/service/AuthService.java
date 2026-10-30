@@ -94,6 +94,30 @@ public class AuthService {
     return toSummary(user);
   }
 
+  @Transactional(readOnly = true)
+  public AuthResponse refresh(Long userId, String email, String ipAddress) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+    if (!user.isEnabled()) {
+      throw new ForbiddenException("Account is disabled. Please contact administrator.");
+    }
+    String token = jwtTokenProvider.generateToken(user);
+    auditLogService.log(
+        user.getId(),
+        email == null ? user.getEmail() : email,
+        ipAddress,
+        "TOKEN_REFRESH",
+        user.getId(),
+        user.getEmail(),
+        "Access token refreshed",
+        "SUCCESS",
+        null);
+    return new AuthResponse(
+        token, "Bearer", jwtTokenProvider.getExpirationSeconds(), toSummary(user));
+  }
+
   public UserSummary toSummary(User user) {
     return new UserSummary(
         user.getId(),
